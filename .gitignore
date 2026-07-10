@@ -1,0 +1,4 @@
+.overlord/logs/
+.overlord/tmp/
+
+.DS_Store
