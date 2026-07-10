@@ -1,0 +1,10 @@
+sources:
+  - name: "local"
+    kind: "local"
+install_path: ".claude/skills"
+skills:
+  - slug: "overlord-integrations"
+  - slug: "changelog"
+  - slug: "code-review"
+  - slug: "security-audit"
+  - slug: "zod-v4-patterns"

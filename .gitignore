@@ -2,3 +2,23 @@
 .overlord/tmp/
 
 .DS_Store
+
+.env
+
+# Build output
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Yarn (node-modules linker + Corepack)
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
+
+# Spikes
+spikes/

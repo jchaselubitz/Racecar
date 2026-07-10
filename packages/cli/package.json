@@ -1,0 +1,23 @@
+{
+  "name": "@racecar/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "racecar": "./dist/main.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "start": "node ./dist/main.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@racecar/core": "workspace:^",
+    "@racecar/shim": "workspace:^"
+  }
+}

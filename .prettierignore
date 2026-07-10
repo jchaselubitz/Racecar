@@ -1,0 +1,13 @@
+dist
+node_modules
+.yarn
+.yarnrc.yml
+.pnp.*
+yarn.lock
+coverage
+spikes
+
+# Prose / non-source docs are not Prettier-managed
+*.md
+.claude
+.overlord
