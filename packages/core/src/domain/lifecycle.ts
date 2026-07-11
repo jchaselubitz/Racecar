@@ -30,6 +30,11 @@ export interface LifecyclePolicy {
    * Enforced by Racecar at creation time.
    */
   readonly maxConcurrentSandboxes: number;
+  /**
+   * Project-scope cap on the summed modeled hourly spend (USD) of the project's
+   * live sandboxes. `0` disables the cap. Enforced by Racecar at creation time.
+   */
+  readonly maxHourlySpendUsd: number;
 }
 
 /**
@@ -43,6 +48,7 @@ export const DEFAULT_LIFECYCLE_POLICY: LifecyclePolicy = {
   autoDeleteMinutes: -1,
   retentionDays: 7,
   maxConcurrentSandboxes: 5,
+  maxHourlySpendUsd: 0,
 };
 
 /** Fill any unset fields of a partial policy from {@link DEFAULT_LIFECYCLE_POLICY}. */

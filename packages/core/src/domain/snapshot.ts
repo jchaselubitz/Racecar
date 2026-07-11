@@ -39,3 +39,36 @@ export interface Snapshot {
 export function isSnapshotStale(snapshot: Snapshot, currentLockfileHash: string): boolean {
   return snapshot.lockfileHash !== undefined && snapshot.lockfileHash !== currentLockfileHash;
 }
+
+/**
+ * What the staleness-automation sweep should do about a snapshot:
+ *
+ *  - `fresh` — the snapshot matches the current lockfile (or has no baked hash);
+ *    nothing to do.
+ *  - `rebuild` — the snapshot is stale and the project opts into automatic
+ *    rebuilds, so the control plane should kick off an (async) rebuild.
+ *  - `warn` — the snapshot is stale but auto-rebuild is off, so surface it and
+ *    leave the rebuild to an explicit `racecar snapshot build`.
+ *  - `building` — a rebuild is already in flight; do not start another.
+ */
+export type SnapshotRebuildDecision = 'fresh' | 'rebuild' | 'warn' | 'building';
+
+/**
+ * Decide how to handle a snapshot given the checkout's current lockfile hash.
+ * Pure, so the automation policy is testable without touching a provider. A
+ * `currentLockfileHash` of undefined (no lockfile in the checkout) is treated as
+ * fresh — there is nothing to rebuild against.
+ */
+export function decideSnapshotRebuild(
+  snapshot: Snapshot,
+  currentLockfileHash: string | undefined,
+  options: { readonly autoRebuild: boolean } = { autoRebuild: false },
+): SnapshotRebuildDecision {
+  if (currentLockfileHash === undefined || !isSnapshotStale(snapshot, currentLockfileHash)) {
+    return 'fresh';
+  }
+  if (snapshot.state === 'building') {
+    return 'building';
+  }
+  return options.autoRebuild ? 'rebuild' : 'warn';
+}

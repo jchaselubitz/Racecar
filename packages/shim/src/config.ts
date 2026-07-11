@@ -1,6 +1,8 @@
 /**
  * Daemon configuration, resolved from the environment the sandbox boot injects.
  */
+import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { resolveAgentSelection, type AgentSelection } from './agents.js';
 import {
   SHIM_AGENT_ARGS_ENV,
@@ -12,6 +14,7 @@ import {
   SHIM_HOST_ENV,
   SHIM_PORT_ENV,
   SHIM_TOKEN_ENV,
+  shimTokenFilePath,
   type ShimAgentKind,
 } from './contract.js';
 
@@ -38,10 +41,10 @@ export class ConfigError extends Error {
  * instead. Port and host fall back to the shared defaults.
  */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ShimConfig {
-  const token = env[SHIM_TOKEN_ENV];
+  const token = resolveToken(env);
   if (token === undefined || token.length === 0) {
     throw new ConfigError(
-      `${SHIM_TOKEN_ENV} is required; the shim refuses to serve without a per-sandbox token`,
+      `no shim token found (neither ${shimTokenFilePath('$HOME')} nor ${SHIM_TOKEN_ENV}); the shim refuses to serve without a per-sandbox token`,
     );
   }
   const portRaw = env[SHIM_PORT_ENV];
@@ -55,6 +58,26 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ShimConfig {
   }
   const host = env[SHIM_HOST_ENV] ?? '0.0.0.0';
   return { host, port, token, agent: resolveAgent(env) };
+}
+
+/**
+ * Resolve the live per-sandbox token, preferring the token file over the env
+ * var. The file is the rotation-aware source of truth: `racecar shim
+ * rotate-token` overwrites it (and restarts the daemon) while the sandbox's
+ * original {@link SHIM_TOKEN_ENV} value stays baked in, so reading the file
+ * first is what lets a rotated token win. The env var remains the fallback for
+ * the first boot before the file has been written and for tests.
+ */
+function resolveToken(env: NodeJS.ProcessEnv): string | undefined {
+  const home = env.HOME !== undefined && env.HOME.length > 0 ? env.HOME : homedir();
+  try {
+    const fromFile = readFileSync(shimTokenFilePath(home), 'utf8').trim();
+    if (fromFile.length > 0) return fromFile;
+  } catch {
+    // No token file yet (first boot) or unreadable — fall back to the env var.
+  }
+  const fromEnv = env[SHIM_TOKEN_ENV];
+  return fromEnv !== undefined && fromEnv.length > 0 ? fromEnv : undefined;
 }
 
 /**

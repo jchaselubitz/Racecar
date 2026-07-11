@@ -8,9 +8,12 @@ export {
   SHIM_PORT_ENV,
   SHIM_TMUX_SESSION,
   SHIM_TOKEN_ENV,
+  SHIM_TOKEN_FILE,
   generateShimToken,
   shimBootScript,
+  shimRebootScript,
   shimStatusScript,
   shimTokenScript,
   type ShimBootParams,
+  type ShimRebootParams,
 } from './launch.js';

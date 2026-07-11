@@ -19,6 +19,7 @@
  */
 import { ensureSessionScript, TMUX_SESSION } from '../tmux/tmux.js';
 import type { RunStatus } from '../domain/run.js';
+import type { FailureCode } from '../reliability/failure.js';
 import { PROMPT_VAR, type AgentSpec } from './agents.js';
 
 /** Base directory (as a shell expression) that holds every run's state files. */
@@ -66,6 +67,12 @@ export interface RunRecord extends RunMeta {
   readonly status: RunStatus;
   readonly endedAt?: string;
   readonly exitCode?: number;
+  /**
+   * Deterministic failure code recorded by the wrapper for a non-zero run:
+   * `timeout` when the run was killed for overrunning its budget, otherwise
+   * `run_failed`. Absent for a run that succeeded or has not ended.
+   */
+  readonly failCode?: FailureCode;
   /** `git status --porcelain` captured at run end (empty when the tree is clean). */
   readonly gitStatus?: string;
   /** `git diff --stat` against the run's baseline commit, captured at run end. */
@@ -116,7 +123,15 @@ export function parseLockResult(output: string): LockResult {
  * The wrapper that runs inside tmux. It records the baseline commit and a
  * `running` status, runs the agent with its stdout/stderr teed to a log,
  * captures the exit code and a git status/diff summary, writes the terminal
- * status, and releases the lock on exit (including on interrupt).
+ * status and a deterministic failure code, and releases the lock on exit
+ * (including on interrupt).
+ *
+ * In-sandbox timeout: when `RACECAR_RUN_TIMEOUT` (seconds) is set and positive,
+ * the agent is launched under coreutils `timeout`, which kills it if it overruns
+ * — enforcement that holds even when no client is attached to notice. A killed
+ * run exits 124 (SIGTERM) or 137 (SIGKILL after the grace period), which the
+ * wrapper records as the deterministic `timeout` failure code; any other
+ * non-zero exit records `run_failed`.
  */
 export function runWrapperScript(agent: AgentSpec): string {
   return [
@@ -132,7 +147,13 @@ export function runWrapperScript(agent: AgentSpec): string {
     'git rev-parse HEAD > "$REC.basehead" 2>/dev/null || : > "$REC.basehead"',
     'printf \'running\' > "$REC.status"',
     // Run the agent; never let a failure abort before the outcome is recorded.
-    `${agent.command} > "$REC.log" 2>&1`,
+    // Under a positive RACECAR_RUN_TIMEOUT, `timeout` bounds the wall clock and
+    // SIGKILLs 10s after SIGTERM if the agent ignores it.
+    'if [ -n "${RACECAR_RUN_TIMEOUT:-}" ] && [ "${RACECAR_RUN_TIMEOUT}" -gt 0 ] 2>/dev/null; then',
+    `  timeout -k 10 "$RACECAR_RUN_TIMEOUT" ${agent.command} > "$REC.log" 2>&1`,
+    'else',
+    `  ${agent.command} > "$REC.log" 2>&1`,
+    'fi',
     'EXIT=$?',
     `printf '%s' "$EXIT" > "$REC.exit"`,
     'date -u +%Y-%m-%dT%H:%M:%SZ > "$REC.ended"',
@@ -145,8 +166,13 @@ export function runWrapperScript(agent: AgentSpec): string {
     'fi',
     'if [ "$EXIT" = "0" ]; then',
     '  printf \'succeeded\' > "$REC.status"',
+    '  : > "$REC.failcode"',
+    'elif [ "$EXIT" = "124" ] || [ "$EXIT" = "137" ]; then',
+    '  printf \'failed\' > "$REC.status"',
+    '  printf \'timeout\' > "$REC.failcode"',
     'else',
     '  printf \'failed\' > "$REC.status"',
+    '  printf \'run_failed\' > "$REC.failcode"',
     'fi',
   ].join('\n');
 }
@@ -157,6 +183,12 @@ export interface LaunchRunParams {
   readonly agent: AgentSpec;
   readonly workspaceDir: string;
   readonly session?: string;
+  /**
+   * In-sandbox wall-clock budget in seconds. When positive, the wrapper runs the
+   * agent under `timeout` and records a deterministic `timeout` failure code if
+   * it overruns. Omitted or `0` disables the in-sandbox timeout.
+   */
+  readonly timeoutSeconds?: number;
 }
 
 /**
@@ -173,9 +205,14 @@ export function launchRunScript(params: LaunchRunParams): string {
   const metaJson = JSON.stringify(meta);
   // The wrapper needs the run id and workdir; export them into the pane so the
   // send-keys command line stays free of the (already-safe) values and the
-  // wrapper reads a single, consistent source.
+  // wrapper reads a single, consistent source. A positive timeout is exported
+  // the same way so the wrapper bounds the agent's wall clock.
+  const timeout =
+    params.timeoutSeconds !== undefined && params.timeoutSeconds > 0
+      ? `RACECAR_RUN_TIMEOUT=${Math.floor(params.timeoutSeconds)} `
+      : '';
   const launch =
-    `RACECAR_RUN_ID=${sq(id)} RACECAR_RUN_WORKDIR=${sq(workspaceDir)} ` +
+    `${timeout}RACECAR_RUN_ID=${sq(id)} RACECAR_RUN_WORKDIR=${sq(workspaceDir)} ` +
     `bash ${RUN_DIR}/${sq(id)}.sh`;
   return [
     'set -eu',
@@ -216,6 +253,7 @@ export function readRunsScript(ids?: readonly string[]): string {
     `  printf 'started:%s\\n' "$(cat "$B/$id.started" 2>/dev/null)"`,
     `  printf 'status:%s\\n' "$(cat "$B/$id.status" 2>/dev/null)"`,
     `  printf 'exit:%s\\n' "$(cat "$B/$id.exit" 2>/dev/null)"`,
+    `  printf 'failcode:%s\\n' "$(cat "$B/$id.failcode" 2>/dev/null)"`,
     `  printf 'ended:%s\\n' "$(cat "$B/$id.ended" 2>/dev/null)"`,
     `  printf 'gitstatus:%s\\n' "$(base64 -w0 "$B/$id.gitstatus" 2>/dev/null)"`,
     `  printf 'gitdiff:%s\\n' "$(base64 -w0 "$B/$id.gitdiff" 2>/dev/null)"`,
@@ -261,6 +299,11 @@ export function parseRunRecords(output: string): RunRecord[] {
     const endedAt = (fields.get('ended') ?? '').trim();
     const exitToken = (fields.get('exit') ?? '').trim();
     const exitCode = exitToken.length > 0 ? Number(exitToken) : undefined;
+    const failToken = (fields.get('failcode') ?? '').trim();
+    const failCode =
+      failToken === 'timeout' || failToken === 'run_failed'
+        ? (failToken as FailureCode)
+        : undefined;
     const gitStatus = decodeB64(fields.get('gitstatus') ?? '');
     const gitDiffStat = decodeB64(fields.get('gitdiff') ?? '');
     records.push({
@@ -269,6 +312,7 @@ export function parseRunRecords(output: string): RunRecord[] {
       status,
       ...(endedAt.length > 0 ? { endedAt } : {}),
       ...(exitCode !== undefined && Number.isFinite(exitCode) ? { exitCode } : {}),
+      ...(failCode !== undefined ? { failCode } : {}),
       ...(gitStatus.length > 0 ? { gitStatus } : {}),
       ...(gitDiffStat.length > 0 ? { gitDiffStat } : {}),
     });

@@ -186,7 +186,9 @@ Deliverables:
   credentials. Verify in-allowlist destinations succeed and others are blocked.
 
 **Exit criteria:** a week of real multi-mission use with no manual sandbox
-cleanup, no leaked credentials in any log or label, and no surprise spend.
+cleanup, no leaked credentials in any log or label, no surprise spend, and
+verified firewall behavior: approved destinations remain reachable while an
+unapproved destination is blocked for every newly created sandbox.
 
 ## Stage 6 — Overlord adapter
 

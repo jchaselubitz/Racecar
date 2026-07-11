@@ -19,6 +19,14 @@ export interface Project {
   readonly workspaceDir: string;
   /** Lifecycle policy inherited by this project's sandboxes. */
   readonly lifecycle: LifecyclePolicy;
+  /**
+   * When true, a sandbox created against a stale snapshot kicks off an async
+   * snapshot rebuild so the *next* sandbox boots fresh, without blocking the
+   * current mission. When false (the default), staleness only warns.
+   */
+  readonly autoRebuildSnapshot: boolean;
+  /** Extra outbound domains allowed for this project's sandboxes. */
+  readonly egressAllowlist: readonly string[];
   /** ISO-8601 creation timestamp. */
   readonly createdAt: string;
 }
@@ -31,6 +39,8 @@ export interface DefineProjectInput {
   readonly defaultBranch?: string;
   readonly workspaceDir?: string;
   readonly lifecycle?: Partial<LifecyclePolicy>;
+  readonly autoRebuildSnapshot?: boolean;
+  readonly egressAllowlist?: readonly string[];
   readonly createdAt?: string;
 }
 
@@ -49,6 +59,8 @@ export function defineProject(input: DefineProjectInput): Project {
     defaultBranch: input.defaultBranch ?? 'main',
     workspaceDir: input.workspaceDir ?? DEFAULT_WORKSPACE_DIR,
     lifecycle: resolveLifecyclePolicy(input.lifecycle),
+    autoRebuildSnapshot: input.autoRebuildSnapshot ?? false,
+    egressAllowlist: input.egressAllowlist ?? [],
     createdAt: input.createdAt ?? new Date().toISOString(),
   };
 }

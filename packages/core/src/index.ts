@@ -18,10 +18,16 @@
 /** Package identifier, useful for diagnostics and version banners. */
 export const CORE_PACKAGE = '@racecar/core';
 
+export * from './cost/index.js';
 export * from './credentials/index.js';
 export * from './domain/index.js';
+export * from './firewall/index.js';
+export * from './quota/index.js';
 export * from './labels/index.js';
 export * from './provider/index.js';
+export * from './reconcile/index.js';
+export * from './reliability/index.js';
+export * from './security/index.js';
 export * from './run/index.js';
 export * from './shim/index.js';
 export * from './tmux/index.js';

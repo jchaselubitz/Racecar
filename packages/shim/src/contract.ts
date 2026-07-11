@@ -28,6 +28,22 @@ export const SHIM_PORT_ENV = 'RACECAR_SHIM_PORT';
  */
 export const SHIM_TOKEN_ENV = 'RACECAR_SHIM_TOKEN';
 
+/**
+ * Path (relative to the sandbox user's home) of the file the daemon reads its
+ * token from. The boot script writes it `0600` from {@link SHIM_TOKEN_ENV}, and
+ * the daemon prefers it over the env var — so a token *rotation*, which rewrites
+ * only this file, takes effect on the next daemon restart even though the
+ * sandbox's baked-in env var still carries the original token. Keeping the live
+ * token in a file the control plane can overwrite is what makes rotation possible
+ * without recreating the sandbox.
+ */
+export const SHIM_TOKEN_FILE_RELATIVE = '.racecar/shim.token';
+
+/** Absolute in-sandbox path of the shim token file under the given home dir. */
+export function shimTokenFilePath(home: string): string {
+  return `${home.replace(/\/+$/, '')}/${SHIM_TOKEN_FILE_RELATIVE}`;
+}
+
 /** Env var selecting the interface the daemon binds (defaults to all: 0.0.0.0). */
 export const SHIM_HOST_ENV = 'RACECAR_SHIM_HOST';
 

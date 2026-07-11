@@ -59,6 +59,19 @@ export function installOutputRedaction(redactor: Redactor): void {
   wrapStream(process.stderr, redactor);
 }
 
+/**
+ * Build a {@link Redactor} from the current store's secrets, for redacting text
+ * Racecar captures out of a sandbox (e.g. reconciliation log artifacts) before
+ * it is persisted. Best-effort: an unreadable store yields an empty redactor.
+ */
+export async function loadStoredRedactor(): Promise<Redactor> {
+  try {
+    return new Redactor(await openCredentialStore().secrets());
+  } catch {
+    return new Redactor([]);
+  }
+}
+
 /** Best-effort redaction setup from the current store; never throws. */
 export async function installStoredSecretRedaction(): Promise<void> {
   try {

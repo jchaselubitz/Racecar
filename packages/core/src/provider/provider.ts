@@ -70,6 +70,10 @@ export interface CreateSandboxRequest {
   readonly autoArchiveMinutes?: number;
   readonly autoDeleteMinutes?: number;
   readonly public?: boolean;
+  /** Deny all egress except the supplied domain allowlist. */
+  readonly networkBlockAll?: boolean;
+  /** Domains allowed through the provider's domain-level firewall. */
+  readonly domainAllowList?: readonly string[];
   /** Provider create timeout in seconds. */
   readonly timeoutSeconds?: number;
 }

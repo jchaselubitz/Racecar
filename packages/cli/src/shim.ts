@@ -13,8 +13,10 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import {
   shimBootScript,
+  shimRebootScript,
   shimStatusScript,
   SHIM_TMUX_SESSION,
+  SHIM_TOKEN_ENV,
   type SandboxProvider,
 } from '@racecar/core';
 
@@ -50,6 +52,33 @@ export async function bootShim(provider: SandboxProvider, sandboxId: string): Pr
   });
   if (boot.exitCode !== 0) {
     throw new Error(`shim boot script failed in '${sandboxId}':\n${boot.output}`);
+  }
+  const status = await provider.exec(sandboxId, {
+    command: shimStatusScript(SHIM_TMUX_SESSION),
+    timeoutSeconds: 15,
+  });
+  return parseShimRunning(status.output);
+}
+
+/**
+ * Rotate a sandbox's per-sandbox shim token to `newToken` and restart the
+ * daemon so it serves under the new value. The token travels out-of-band as the
+ * exec's env (never in the command string), and the reboot script rewrites the
+ * `0600` token file and relaunches the daemon's tmux session. Returns whether the
+ * daemon came back up. Any client holding the old token is disconnected.
+ */
+export async function rotateShimToken(
+  provider: SandboxProvider,
+  sandboxId: string,
+  newToken: string,
+): Promise<boolean> {
+  const reboot = await provider.exec(sandboxId, {
+    command: shimRebootScript(),
+    env: { [SHIM_TOKEN_ENV]: newToken },
+    timeoutSeconds: 30,
+  });
+  if (reboot.exitCode !== 0) {
+    throw new Error(`shim token rotation failed in '${sandboxId}':\n${reboot.output}`);
   }
   const status = await provider.exec(sandboxId, {
     command: shimStatusScript(SHIM_TMUX_SESSION),

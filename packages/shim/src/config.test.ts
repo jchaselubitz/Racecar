@@ -1,3 +1,6 @@
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   SHIM_AGENT_ARGS_ENV,
@@ -6,13 +9,37 @@ import {
   SHIM_DEFAULT_PORT,
   SHIM_PORT_ENV,
   SHIM_TOKEN_ENV,
+  SHIM_TOKEN_FILE_RELATIVE,
 } from './contract.js';
 import { ConfigError, loadConfig } from './config.js';
 
+/** A throwaway HOME containing a token file, for the file-preference tests. */
+function homeWithTokenFile(token: string): string {
+  const home = mkdtempSync(join(tmpdir(), 'racecar-shim-home-'));
+  const path = join(home, SHIM_TOKEN_FILE_RELATIVE);
+  mkdirSync(join(home, '.racecar'), { recursive: true });
+  writeFileSync(path, `${token}\n`);
+  return home;
+}
+
 describe('loadConfig', () => {
   it('requires a token', () => {
-    expect(() => loadConfig({})).toThrow(ConfigError);
-    expect(() => loadConfig({ [SHIM_TOKEN_ENV]: '' })).toThrow(ConfigError);
+    // Point HOME at an empty dir so no stray host token file is picked up.
+    const home = mkdtempSync(join(tmpdir(), 'racecar-shim-empty-'));
+    expect(() => loadConfig({ HOME: home })).toThrow(ConfigError);
+    expect(() => loadConfig({ HOME: home, [SHIM_TOKEN_ENV]: '' })).toThrow(ConfigError);
+  });
+
+  it('prefers the token file over the injected env var (rotation-aware)', () => {
+    const home = homeWithTokenFile('rotated-token');
+    const config = loadConfig({ HOME: home, [SHIM_TOKEN_ENV]: 'original-token' });
+    expect(config.token).toBe('rotated-token');
+  });
+
+  it('falls back to the env var when no token file exists', () => {
+    const home = mkdtempSync(join(tmpdir(), 'racecar-shim-empty-'));
+    const config = loadConfig({ HOME: home, [SHIM_TOKEN_ENV]: 'env-token' });
+    expect(config.token).toBe('env-token');
   });
 
   it('defaults the port, host, and echo agent', () => {

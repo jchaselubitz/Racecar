@@ -3,7 +3,9 @@ import {
   generateShimToken,
   SHIM_BUNDLE_PATH,
   SHIM_TMUX_SESSION,
+  SHIM_TOKEN_ENV,
   shimBootScript,
+  shimRebootScript,
   shimStatusScript,
 } from './index.js';
 
@@ -30,8 +32,18 @@ describe('shimBootScript', () => {
     expect(script).toContain(`tmux new-session -d -s '${SHIM_TMUX_SESSION}'`);
   });
 
-  it('never interpolates the token (read from the daemon env, not the script)', () => {
-    expect(script).not.toContain('RACECAR_SHIM_TOKEN=');
+  it('never interpolates the token value (only references the env var name)', () => {
+    // The token file is written from the env var, so the var name appears — but
+    // no `NAME=value` assignment that would embed a literal secret.
+    expect(script).not.toContain(`${SHIM_TOKEN_ENV}=`);
+    expect(script).toContain(`"$${SHIM_TOKEN_ENV}"`);
+  });
+
+  it('materializes the token file 0600 from the env var', () => {
+    expect(script).toContain('shim.token');
+    expect(script).toContain(`printf '%s' "$${SHIM_TOKEN_ENV}" >`);
+    expect(script).toContain('chmod 600');
+    expect(script).toContain('umask 077');
   });
 
   it('honors a custom bundle path and session', () => {
@@ -42,6 +54,27 @@ describe('shimBootScript', () => {
     });
     expect(custom).toContain('/srv/shim.cjs');
     expect(custom).toContain(`tmux new-session -d -s 'custom-shim'`);
+  });
+});
+
+describe('shimRebootScript', () => {
+  const script = shimRebootScript();
+
+  it('rewrites the token file and restarts the daemon without re-delivering the bundle', () => {
+    // Rotation-only: no bundle re-shipping (that stays in shimBootScript).
+    expect(script).not.toContain('base64 -d >');
+    expect(script).toContain(`printf '%s' "$${SHIM_TOKEN_ENV}" >`);
+    expect(script).toContain('shim.token');
+    expect(script).toContain(`tmux kill-session -t '${SHIM_TMUX_SESSION}'`);
+    expect(script).toContain(`tmux new-session -d -s '${SHIM_TMUX_SESSION}'`);
+  });
+
+  it('never embeds a token literal', () => {
+    expect(script).not.toContain(`${SHIM_TOKEN_ENV}=`);
+  });
+
+  it('runs the on-disk bundle by default', () => {
+    expect(script).toContain(SHIM_BUNDLE_PATH);
   });
 });
 

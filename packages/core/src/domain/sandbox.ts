@@ -19,6 +19,8 @@ export interface Sandbox {
   readonly branch: string;
   /** Snapshot the sandbox was created from (from labels). */
   readonly snapshot: string;
+  /** Resource class the sandbox was sized as (from labels), if recorded. */
+  readonly resourceClass?: string;
   /** ISO-8601 creation timestamp (from labels). */
   readonly createdAt: string;
   /** ISO-8601 timestamp of the sandbox's last activity, if reported. */
@@ -44,6 +46,7 @@ export function toSandbox(provider: ProviderSandbox): Sandbox | null {
     mission: meta.mission,
     branch: meta.branch,
     snapshot: meta.snapshot,
+    ...(meta.resourceClass !== undefined ? { resourceClass: meta.resourceClass } : {}),
     createdAt: meta.createdAt,
     ...(provider.lastActivityAt !== undefined ? { lastActivityAt: provider.lastActivityAt } : {}),
     labels: provider.labels,

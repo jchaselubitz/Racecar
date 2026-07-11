@@ -27,6 +27,7 @@ export * from './agents.js';
 export * from './runs.js';
 export * from './run-server.js';
 export * from './mailbox.js';
+export * from './delivery.js';
 export * from './client.js';
 export * from './mirror.js';
 export * from './git.js';

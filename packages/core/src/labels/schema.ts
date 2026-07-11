@@ -40,6 +40,8 @@ export const SandboxLabelKeys = {
   branch: `${LABEL_NAMESPACE}.branch`,
   /** Snapshot the sandbox was created from. */
   snapshot: `${LABEL_NAMESPACE}.snapshot`,
+  /** Resource class the sandbox was sized as (drives estimated spend). */
+  resourceClass: `${LABEL_NAMESPACE}.resource-class`,
   /** Role of the sandbox (e.g. a mission workspace vs. a snapshot-build box). */
   role: `${LABEL_NAMESPACE}.role`,
   /** ISO-8601 creation timestamp, so listings need no extra provider call. */
@@ -61,6 +63,8 @@ export interface SandboxMetadata {
   readonly branch: string;
   readonly snapshot: string;
   readonly createdAt: string;
+  /** Resource class the sandbox was sized as. */
+  readonly resourceClass?: string;
   /** Sandbox role; typically one of {@link SandboxRole}, but left open. */
   readonly role?: string;
   readonly createdBy?: string;
@@ -132,6 +136,9 @@ export function encodeSandboxLabels(meta: SandboxMetadata): Record<string, strin
     [SandboxLabelKeys.snapshot]: meta.snapshot,
     [SandboxLabelKeys.createdAt]: meta.createdAt,
   };
+  if (meta.resourceClass !== undefined) {
+    labels[SandboxLabelKeys.resourceClass] = meta.resourceClass;
+  }
   if (meta.role !== undefined) {
     labels[SandboxLabelKeys.role] = meta.role;
   }
@@ -173,6 +180,7 @@ export function decodeSandboxLabels(labels: Record<string, string>): SandboxMeta
   ) {
     return null;
   }
+  const resourceClass = labels[SandboxLabelKeys.resourceClass];
   const role = labels[SandboxLabelKeys.role];
   const createdBy = labels[SandboxLabelKeys.createdBy];
   return {
@@ -181,6 +189,7 @@ export function decodeSandboxLabels(labels: Record<string, string>): SandboxMeta
     branch,
     snapshot,
     createdAt,
+    ...(resourceClass !== undefined ? { resourceClass } : {}),
     ...(role !== undefined ? { role } : {}),
     ...(createdBy !== undefined ? { createdBy } : {}),
   };

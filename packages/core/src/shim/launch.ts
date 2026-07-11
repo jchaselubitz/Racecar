@@ -36,6 +36,14 @@ export const SHIM_TMUX_SESSION = 'racecar-shim';
 /** Absolute path the shim bundle is written to and run from inside the sandbox. */
 export const SHIM_BUNDLE_PATH = '/opt/racecar/racecar-shim.cjs';
 
+/**
+ * In-sandbox path of the token file the daemon reads. Must match the shim's
+ * {@link shimTokenFilePath}(`$HOME`); duplicated here (like {@link SHIM_TOKEN_ENV})
+ * so `@racecar/core` need not depend on `@racecar/shim`. The `$HOME` is expanded
+ * by the sandbox shell, so the literal path is resolved there, not on the host.
+ */
+export const SHIM_TOKEN_FILE = '"$HOME"/.racecar/shim.token';
+
 /** A cryptographically strong, URL-safe per-sandbox token (base64url, 32 bytes). */
 export function generateShimToken(bytes = 32): string {
   return randomBytes(bytes).toString('base64url');
@@ -74,13 +82,63 @@ export function shimBootScript(params: ShimBootParams): string {
   const path = params.bundlePath ?? SHIM_BUNDLE_PATH;
   const session = params.session ?? SHIM_TMUX_SESSION;
   const dir = path.slice(0, path.lastIndexOf('/')) || '/';
-  const launch = `node ${sq(path)} > "$HOME/.racecar/shim.log" 2>&1`;
   return [
     'set -eu',
     `mkdir -p ${sq(dir)} "$HOME/.racecar"`,
     `printf '%s' ${sq(b64(params.bundle))} | base64 -d > ${sq(path)}`,
+    ...writeTokenFileLines(),
+    ...relaunchLines(path, session),
+  ].join('\n');
+}
+
+/**
+ * Lines that materialize the token file `0600` from {@link SHIM_TOKEN_ENV}. They
+ * reference the env var *name* only, so no token literal enters the command
+ * string (and thus no exec log). At creation the value comes from the sandbox's
+ * baked-in env var; at rotation it comes from the token passed out-of-band to the
+ * exec that runs {@link shimRebootScript}, so the same lines write the new token.
+ */
+function writeTokenFileLines(): string[] {
+  return [
+    'umask 077',
+    `printf '%s' "$${SHIM_TOKEN_ENV}" > ${SHIM_TOKEN_FILE}`,
+    `chmod 600 ${SHIM_TOKEN_FILE}`,
+  ];
+}
+
+/** Lines that (re)start the shim daemon detached in its own tmux session. */
+function relaunchLines(path: string, session: string): string[] {
+  const launch = `node ${sq(path)} > "$HOME/.racecar/shim.log" 2>&1`;
+  return [
     `tmux kill-session -t ${sq(session)} 2>/dev/null || true`,
     `tmux new-session -d -s ${sq(session)} ${sq(launch)}`,
+  ];
+}
+
+/** Options for {@link shimRebootScript}. */
+export interface ShimRebootParams {
+  /** Where the bundle already lives. Defaults to {@link SHIM_BUNDLE_PATH}. */
+  readonly bundlePath?: string;
+  /** tmux session to run in. Defaults to {@link SHIM_TMUX_SESSION}. */
+  readonly session?: string;
+}
+
+/**
+ * Script that rotates the per-sandbox shim token and restarts the daemon without
+ * re-delivering the bundle (which is already on disk). It rewrites the token file
+ * from {@link SHIM_TOKEN_ENV} — supplied out-of-band as the exec's env, so the
+ * new token never appears in the command — then kills and relaunches the daemon's
+ * tmux session so it reads the rotated token. Any client using the old token is
+ * disconnected and must reconnect with the new one.
+ */
+export function shimRebootScript(params: ShimRebootParams = {}): string {
+  const path = params.bundlePath ?? SHIM_BUNDLE_PATH;
+  const session = params.session ?? SHIM_TMUX_SESSION;
+  return [
+    'set -eu',
+    'mkdir -p "$HOME/.racecar"',
+    ...writeTokenFileLines(),
+    ...relaunchLines(path, session),
   ].join('\n');
 }
 

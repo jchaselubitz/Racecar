@@ -9,6 +9,7 @@ import {
   readRunsScript,
   resolveAgent,
   runStatusScript,
+  runWrapperScript,
   type RunMeta,
 } from './index.js';
 
@@ -78,6 +79,29 @@ describe('launchRunScript', () => {
     expect(script).not.toContain('rm -rf /');
     expect(script).not.toContain('dangerous');
   });
+
+  it('exports the in-sandbox timeout only when a positive one is given', () => {
+    const withTimeout = launchRunScript({
+      meta,
+      agent: resolveAgent('claude-code'),
+      workspaceDir: '/w',
+      timeoutSeconds: 1800,
+    });
+    expect(withTimeout).toContain('RACECAR_RUN_TIMEOUT=1800');
+    expect(script).not.toContain('RACECAR_RUN_TIMEOUT');
+  });
+});
+
+describe('runWrapperScript', () => {
+  const script = runWrapperScript(resolveAgent('claude-code'));
+
+  it('runs the agent under timeout when a budget is set and records failure codes', () => {
+    expect(script).toContain('RACECAR_RUN_TIMEOUT');
+    expect(script).toContain('timeout -k 10 "$RACECAR_RUN_TIMEOUT"');
+    // A killed run (124/137) records the deterministic timeout code.
+    expect(script).toContain('printf \'timeout\' > "$REC.failcode"');
+    expect(script).toContain('printf \'run_failed\' > "$REC.failcode"');
+  });
 });
 
 describe('readRunsScript / parseRunRecords', () => {
@@ -113,6 +137,7 @@ describe('readRunsScript / parseRunRecords', () => {
       'started:2026-01-01T00:00:00Z',
       'status:succeeded',
       'exit:0',
+      'failcode:',
       'ended:2026-01-01T00:05:00Z',
       `gitstatus:${b64(' M src/app.ts\n?? new.ts')}`,
       `gitdiff:${b64(' src/app.ts | 2 +-\n 1 file changed')}`,
@@ -124,10 +149,36 @@ describe('readRunsScript / parseRunRecords', () => {
     const done = records[0];
     expect(done?.status).toBe('succeeded');
     expect(done?.exitCode).toBe(0);
+    expect(done?.failCode).toBeUndefined();
     expect(done?.gitStatus).toContain('?? new.ts');
     expect(done?.gitDiffStat).toContain('1 file changed');
     expect(records[1]?.status).toBe('running');
     expect(records[1]?.exitCode).toBeUndefined();
+  });
+
+  it('surfaces a deterministic failure code for a timed-out run', () => {
+    const meta = {
+      id: 'run-t',
+      sandboxId: 's',
+      agent: 'claude-code',
+      prompt: 'slow',
+      startedAt: '2026-03-01T00:00:00Z',
+    };
+    const b64 = (v: string): string => Buffer.from(v, 'utf8').toString('base64');
+    const output = [
+      '==RUN==',
+      'id:run-t',
+      `meta:${b64(JSON.stringify(meta))}`,
+      'started:2026-03-01T00:00:00Z',
+      'status:failed',
+      'exit:124',
+      'failcode:timeout',
+      'ended:2026-03-01T03:00:00Z',
+      'gitstatus:',
+      'gitdiff:',
+      '',
+    ].join('\n');
+    expect(parseRunRecords(output)[0]).toMatchObject({ status: 'failed', failCode: 'timeout' });
   });
 
   it('skips blocks with no decodable meta', () => {
