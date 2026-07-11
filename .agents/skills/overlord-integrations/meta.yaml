@@ -1,0 +1,12 @@
+slug: overlord-integrations
+name: overlord-integrations
+description: How to navigate the cooperativ-labs/Overlord repository to build an
+  integration (agent connector, database/auth/REST extension, automation, MCP
+  surface, or a downstream client that talks to the protocol/REST API). Explains
+  the contract-first workflow — where the contract lives, how to reference it,
+  and how to check your component against it with `ovld contract check` — plus
+  the repo map and the exact files an integration must add. Use when writing,
+  reviewing, or debugging any code that crosses an Overlord module boundary.
+tags: []
+compat: []
+sha256: 12d4e8c7f9f5dbd0949992b8100a681ad89b5da7acd215889e72d23e0456e230

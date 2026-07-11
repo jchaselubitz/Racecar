@@ -94,3 +94,16 @@ export function shimStatusScript(session: string = SHIM_TMUX_SESSION): string {
     `tail -n 20 "$HOME/.racecar/shim.log" 2>/dev/null || true`,
   ].join('\n');
 }
+
+/**
+ * Script that prints the sandbox's per-sandbox shim token to stdout. The token is
+ * injected as an env var at creation and deliberately never persisted to a label
+ * or local disk, so a client that wants to reach the shim (`racecar chat`,
+ * `racecar run`) reads it back from the running sandbox over the exec channel —
+ * keeping the token a property the control plane owns without a second copy on the
+ * host. The caller must capture this output without echoing it (it is redacted
+ * from any printed output regardless).
+ */
+export function shimTokenScript(): string {
+  return `printf '%s' "${'$'}${SHIM_TOKEN_ENV}"`;
+}

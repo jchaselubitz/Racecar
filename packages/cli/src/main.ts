@@ -26,7 +26,6 @@ import {
   TMUX_SETUP_COMMANDS,
   type AgentStatus,
   type Project,
-  type RunRecord,
   type Sandbox,
   type SandboxProvider,
   type Snapshot,
@@ -34,13 +33,14 @@ import {
 import { banner, option, parseArgs, requireOption, shellQuote } from './index.js';
 import { attachToSandbox } from './attach.js';
 import { auth } from './auth.js';
+import { chatWithSandbox } from './chat.js';
 import {
   installOutputRedaction,
   installStoredSecretRedaction,
   loadCredentialInjection,
 } from './credentials.js';
 import { configureOutput, emitEvent, isJsonMode, report, warn } from './output.js';
-import { listRuns, RunBusyError, startRun } from './run.js';
+import { listRuns, startRun, type ShimRunRecord } from './run.js';
 import { bootShim } from './shim.js';
 
 const STATE_DIR = '.racecar';
@@ -428,12 +428,12 @@ async function attach(args: readonly string[]): Promise<void> {
 }
 
 /** Render a run record as a compact human summary block. */
-function formatRunRecord(record: RunRecord): string {
+function formatRunRecord(record: ShimRunRecord): string {
   const lines = [
-    `${record.id}  [${record.status}]  ${record.agent}`,
+    `${record.runId}  [${record.status}]  ${record.agent}`,
     `  started: ${record.startedAt}${record.endedAt !== undefined ? `  ended: ${record.endedAt}` : ''}`,
   ];
-  if (record.exitCode !== undefined) lines.push(`  exit: ${record.exitCode}`);
+  if (record.stopReason !== undefined) lines.push(`  stop reason: ${record.stopReason}`);
   const changed = (record.gitStatus ?? '').split('\n').filter((l) => l.trim().length > 0).length;
   if (record.gitStatus !== undefined || record.endedAt !== undefined) {
     lines.push(`  changed files: ${changed}`);
@@ -445,15 +445,15 @@ function formatRunRecord(record: RunRecord): string {
 }
 
 /** Serialize a run record for the NDJSON stream. */
-function runEventData(record: RunRecord): Record<string, unknown> {
+function runEventData(record: ShimRunRecord): Record<string, unknown> {
   return {
-    runId: record.id,
+    runId: record.runId,
     sandbox: record.sandboxId,
     agent: record.agent,
     status: record.status,
+    stopReason: record.stopReason ?? null,
     startedAt: record.startedAt,
     endedAt: record.endedAt ?? null,
-    exitCode: record.exitCode ?? null,
     gitStatus: record.gitStatus ?? '',
     gitDiffStat: record.gitDiffStat ?? '',
   };
@@ -473,60 +473,38 @@ async function run(args: readonly string[]): Promise<void> {
   if (sandbox === null) throw new Error(`sandbox '${id}' is not a Racecar-managed sandbox`);
   const workspaceDir = (await workspaceDirFor(sandbox)) ?? DEFAULT_WORKSPACE_DIR;
   const agent = option(parsed, 'agent');
-  const wait = parsed.options.has('wait');
   const timeout = option(parsed, 'timeout');
-  try {
-    const result = await startRun(p, id, prompt, {
-      workspaceDir,
-      wait,
-      force: parsed.options.has('force'),
-      ...(agent !== undefined ? { agent } : {}),
-      ...(timeout !== undefined ? { waitTimeoutSeconds: Number(timeout) } : {}),
-    });
-    report(
-      'run.started',
-      {
-        runId: result.meta.id,
-        sandbox: id,
-        agent: result.meta.agent,
-        startedAt: result.meta.startedAt,
-      },
-      `Started run '${result.meta.id}' (${result.meta.agent}) in '${id}'`,
+  // Stream the agent's reply live in text mode so `racecar run` shows progress;
+  // in JSON mode the events carry it instead.
+  const onUpdate = isJsonMode()
+    ? undefined
+    : (update: Parameters<NonNullable<Parameters<typeof startRun>[3]['onUpdate']>>[0]): void => {
+        if (update.sessionUpdate === 'agent_message_chunk' && update.content.type === 'text') {
+          process.stdout.write(update.content.text);
+        }
+      };
+  const result = await startRun(p, id, prompt, {
+    workspaceDir,
+    ...(agent !== undefined ? { agent } : {}),
+    ...(timeout !== undefined ? { waitTimeoutSeconds: Number(timeout) } : {}),
+    ...(onUpdate !== undefined ? { onUpdate } : {}),
+  });
+  if (result.timedOut === true) {
+    warn(
+      'run.timeout',
+      { runId: result.record.runId, sandbox: id },
+      `run '${result.record.runId}' did not finish before the timeout; it continues in the shim`,
     );
-    if (!wait) {
-      if (!isJsonMode())
-        process.stdout.write(
-          `  watch it:   racecar attach ${id}\n  results:    racecar runs ${id}\n`,
-        );
-      return;
-    }
-    if (result.timedOut === true || result.record === undefined) {
-      warn(
-        'run.timeout',
-        { runId: result.meta.id, sandbox: id },
-        `run '${result.meta.id}' did not finish before the timeout; still running`,
-      );
-      process.exitCode = 1;
-      return;
-    }
-    report(
-      'run.completed',
-      runEventData(result.record),
-      `Run finished:\n${formatRunRecord(result.record)}`,
-    );
-    if (result.record.status !== 'succeeded') process.exitCode = 1;
-  } catch (error) {
-    if (error instanceof RunBusyError) {
-      warn(
-        'run.busy',
-        { sandbox: id, activeRunId: error.activeRunId },
-        `racecar: ${error.message}`,
-      );
-      process.exitCode = 1;
-      return;
-    }
-    throw error;
+    process.exitCode = 1;
+    return;
   }
+  if (!isJsonMode()) process.stdout.write('\n');
+  report(
+    'run.completed',
+    runEventData(result.record),
+    `Run finished:\n${formatRunRecord(result.record)}`,
+  );
+  if (result.record.status !== 'succeeded') process.exitCode = 1;
 }
 
 async function runs(args: readonly string[]): Promise<void> {
@@ -547,8 +525,29 @@ async function runs(args: readonly string[]): Promise<void> {
   process.stdout.write('\n');
 }
 
+async function chat(args: readonly string[]): Promise<void> {
+  const parsed = parseArgs(args);
+  const id = parsed.positional[0];
+  if (id === undefined) throw new Error('chat requires a sandbox id');
+  const p = provider();
+  const found = await p.getSandbox(id);
+  if (found === null) throw new Error(`sandbox '${id}' not found`);
+  const sandbox = toSandbox(found);
+  if (sandbox === null) throw new Error(`sandbox '${id}' is not a Racecar-managed sandbox`);
+  const runId = option(parsed, 'run');
+  const promptArg = parsed.positional[1];
+  const cwd = (await workspaceDirFor(sandbox)) ?? DEFAULT_WORKSPACE_DIR;
+  emitEvent('chat.started', { sandbox: id });
+  await chatWithSandbox(p, id, {
+    cwd,
+    ...(runId !== undefined ? { run: runId } : {}),
+    ...(promptArg !== undefined ? { prompt: promptArg } : {}),
+  });
+  emitEvent('chat.ended', { sandbox: id });
+}
+
 function usage(): string {
-  return `${banner()}\n\nUsage:\n  racecar project init [--name <name>] [--repo <url>] [--branch <branch>]\n  racecar snapshot build --project <project> [--base-image <image>]\n  racecar sandbox create --project <project> --mission <name> [--branch <branch>]\n  racecar sandbox stop|start|rm <sandbox-id>\n  racecar ps [--project <project>] [--watch --interval <seconds>]\n  racecar attach <sandbox-id>\n  racecar run <sandbox-id> "<prompt>" [--agent <${knownAgents().join('|')}>] [--wait [--timeout <seconds>]] [--force]\n  racecar runs <sandbox-id>\n  racecar auth claude [--token <t>] [--stdin]\n  racecar auth git [--host <h>] [--username <u>] [--token <t>] [--stdin]\n  racecar auth list | rm <name>\n\nAdd --json to any command for an NDJSON event stream on stdout.\n\nProvider credentials: DAYTONA_API_KEY (optional DAYTONA_API_URL, DAYTONA_ORGANIZATION_ID, DAYTONA_TARGET).\nCredential store: ~/.racecar (override with RACECAR_HOME; RACECAR_MASTER_KEY sets the encryption key).\n`;
+  return `${banner()}\n\nUsage:\n  racecar project init [--name <name>] [--repo <url>] [--branch <branch>]\n  racecar snapshot build --project <project> [--base-image <image>]\n  racecar sandbox create --project <project> --mission <name> [--branch <branch>]\n  racecar sandbox stop|start|rm <sandbox-id>\n  racecar ps [--project <project>] [--watch --interval <seconds>]\n  racecar attach <sandbox-id>\n  racecar run <sandbox-id> "<prompt>" [--agent <${knownAgents().join('|')}>] [--timeout <seconds>]\n  racecar runs <sandbox-id>\n  racecar chat <sandbox-id> ["<prompt>"] [--run <run-id>]\n  racecar auth claude [--token <t>] [--stdin]\n  racecar auth git [--host <h>] [--username <u>] [--token <t>] [--stdin]\n  racecar auth list | rm <name>\n\nAdd --json to any command for an NDJSON event stream on stdout.\n\nProvider credentials: DAYTONA_API_KEY (optional DAYTONA_API_URL, DAYTONA_ORGANIZATION_ID, DAYTONA_TARGET).\nCredential store: ~/.racecar (override with RACECAR_HOME; RACECAR_MASTER_KEY sets the encryption key).\n`;
 }
 
 async function main(rawArgv: readonly string[]): Promise<void> {
@@ -588,6 +587,8 @@ async function main(rawArgv: readonly string[]): Promise<void> {
     return run([command, ...rest].filter((part): part is string => part !== undefined));
   if (group === 'runs')
     return runs([command, ...rest].filter((part): part is string => part !== undefined));
+  if (group === 'chat')
+    return chat([command, ...rest].filter((part): part is string => part !== undefined));
   if (group === 'auth') {
     const parsed = parseArgs(rest);
     if (await auth(command, parsed)) return;

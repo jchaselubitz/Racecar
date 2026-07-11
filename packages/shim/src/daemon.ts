@@ -7,8 +7,15 @@
  * so a supervising `racecar` can tail it, and it fails loudly (non-zero exit)
  * when the per-sandbox token is missing rather than serving unauthenticated.
  */
-import { buildAgentFactory } from './agents.js';
+import { buildAgent } from './agents.js';
 import { ConfigError, loadConfig } from './config.js';
+import { deliveryTierOf } from './contract.js';
+import { MailboxDelivery } from './delivery.js';
+import { captureGit } from './git.js';
+import { Mailbox, fileMailboxPersistence } from './mailbox.js';
+import { createTranscriptMirror, fileTmuxSinks } from './mirror.js';
+import { RunAgentServer } from './run-server.js';
+import { RunRegistry } from './runs.js';
 import { ShimServer, type ShimLogEvent } from './server.js';
 
 function log(event: ShimLogEvent): void {
@@ -20,16 +27,44 @@ export async function startDaemon(
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<{ port: number; stop: () => Promise<void> }> {
   const config = loadConfig(env);
-  log({ level: 'info', msg: 'agent selected', data: { kind: config.agent.kind } });
+  log({
+    level: 'info',
+    msg: 'agent selected',
+    data: { kind: config.agent.kind, deliveryTier: deliveryTierOf(config.agent.kind) },
+  });
+  // One durable mailbox for the whole sandbox, replayed from its on-disk log so a
+  // stop/start returns to the exact prior state. Shared across connections like
+  // the run registry, so a question and its reply meet even on different sockets.
+  const mailbox = new Mailbox({ persistence: fileMailboxPersistence(env) });
+  // One shared agent and one run registry for the whole daemon, so every
+  // connection sees the same runs — the pivot to shim-owned run state. Each run's
+  // transcript is mirrored into the `racecar` tmux session an attach watches, and
+  // runs post completions/questions to (and are driven from) the mailbox.
+  const registry = new RunRegistry({
+    agent: buildAgent(config.agent, undefined, env),
+    onTranscript: createTranscriptMirror(fileTmuxSinks(env)),
+    captureGit,
+    mailbox,
+  });
+  // Route the mailbox's user→agent traffic to runs, per tier (mid-run injection
+  // for tier 1/2, run-boundary prepend for tier 3), bootstrapping a run when an
+  // instruction arrives at a sandbox with none yet.
+  new MailboxDelivery(mailbox, registry);
   const server = new ShimServer({
     token: config.token,
     port: config.port,
     host: config.host,
-    agentFactory: buildAgentFactory(config.agent, undefined, env),
+    connect: (peer) => new RunAgentServer(peer, registry, mailbox),
     onLog: log,
   });
   const { port } = await server.listen();
-  return { port, stop: () => server.close() };
+  return {
+    port,
+    stop: async () => {
+      await server.close();
+      registry.close();
+    },
+  };
 }
 
 /**

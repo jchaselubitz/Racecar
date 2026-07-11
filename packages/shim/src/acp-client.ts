@@ -129,6 +129,8 @@ class ProcessAcpSession implements AgentSession {
   readonly id: string;
   readonly #peer: JsonRpcPeer;
   readonly #onClose: () => void;
+  /** Whether a `session/prompt` turn is currently in flight (gates injection). */
+  #turnInFlight = false;
 
   constructor(id: string, peer: JsonRpcPeer, onClose: () => void) {
     this.id = id;
@@ -136,11 +138,33 @@ class ProcessAcpSession implements AgentSession {
     this.#onClose = onClose;
   }
 
-  prompt(content: readonly ContentBlock[]): Promise<PromptResponse> {
-    return this.#peer.request<PromptResponse>(AcpMethod.prompt, {
-      sessionId: this.id,
-      prompt: content,
-    });
+  async prompt(content: readonly ContentBlock[]): Promise<PromptResponse> {
+    this.#turnInFlight = true;
+    try {
+      return await this.#peer.request<PromptResponse>(AcpMethod.prompt, {
+        sessionId: this.id,
+        prompt: content,
+      });
+    } finally {
+      this.#turnInFlight = false;
+    }
+  }
+
+  /**
+   * Tier-1 mid-run injection: forward the user's message on the session's own ACP
+   * channel so a native ACP agent folds it into the in-flight turn; its reaction
+   * then streams back as ordinary `session/update` chunks on this same run. The
+   * injected message is not a new shim-owned turn, so its `PromptResponse` is
+   * discarded and its errors swallowed — a non-fatal injection must never crash
+   * the run driving the actual turn. With no turn running it returns `false` so the
+   * shim queues the message for the next prompt instead.
+   */
+  inject(content: readonly ContentBlock[]): boolean {
+    if (!this.#turnInFlight) return false;
+    void this.#peer
+      .request<PromptResponse>(AcpMethod.prompt, { sessionId: this.id, prompt: content })
+      .catch(() => undefined);
+    return true;
   }
 
   cancel(): void {

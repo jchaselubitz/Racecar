@@ -10,11 +10,8 @@
  * is testable without real agent binaries.
  */
 import { ProcessAcpAgent } from './acp-client.js';
-import { EchoAgent, type AgentFactory } from './agent.js';
-import {
-  SHIM_AGENT_DEFAULT_COMMANDS,
-  type ShimAgentKind,
-} from './contract.js';
+import { EchoAgent, type Agent, type AgentFactory } from './agent.js';
+import { SHIM_AGENT_DEFAULT_COMMANDS, type ShimAgentKind } from './contract.js';
 import { spawnAgentProcess, type AgentProcess, type SpawnSpec } from './stdio.js';
 import { StreamJsonAgent } from './stream-json.js';
 
@@ -67,4 +64,19 @@ export function buildAgentFactory(
     case 'stream-json':
       return () => new StreamJsonAgent(() => spawn(spec));
   }
+}
+
+/**
+ * Build a *single* {@link Agent} for a selection — the shared agent the daemon's
+ * {@link RunRegistry} multiplexes every run over. Unlike {@link buildAgentFactory}
+ * (one isolated agent per connection), this is one long-lived agent for the whole
+ * daemon, so runs created on different connections share it and can be observed
+ * across connections. It is the factory invoked exactly once.
+ */
+export function buildAgent(
+  selection: AgentSelection,
+  spawn: SpawnProcess = spawnAgentProcess,
+  env: NodeJS.ProcessEnv = process.env,
+): Agent {
+  return buildAgentFactory(selection, spawn, env)();
 }

@@ -4,6 +4,11 @@ Staged build sequence for the architecture described in the
 [README](../README.md). Each stage has a goal, deliverables, and exit
 criteria; a stage ships something usable on its own before the next begins.
 
+After every stage and exit criterion in this plan is complete, continue with
+the unified [post-v1 Racecar–Overlord plan](post-v1-overlord-racecar-plan.md).
+That successor plan covers local and always-online Racecar execution targets,
+self-hosted gateway packaging, and mission Git integration.
+
 Stack: TypeScript, Node 22, Yarn workspaces. Packages: `packages/core`,
 `packages/cli`, `packages/shim`.
 

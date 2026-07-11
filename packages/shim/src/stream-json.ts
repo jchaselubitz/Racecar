@@ -116,6 +116,25 @@ class StreamJsonSession implements AgentSession {
     });
   }
 
+  /**
+   * Tier-2 mid-run injection: a stream-json agent under streaming input accepts
+   * further `user` envelopes while a turn is in flight, so a queued mailbox
+   * instruction is written straight onto the live subprocess's stdin and folded
+   * into the current turn — its reaction streams back as ordinary chunks on this
+   * session. Only valid mid-turn: with no turn running (or once closed) it returns
+   * `false` so the shim queues the message for the next prompt instead.
+   */
+  inject(content: readonly ContentBlock[]): boolean {
+    if (this.#closed || this.#turn === null) return false;
+    this.#proc.writeLine(
+      JSON.stringify({
+        type: 'user',
+        message: { role: 'user', content: [{ type: 'text', text: promptText(content) }] },
+      }),
+    );
+    return true;
+  }
+
   cancel(): void {
     // stream-json has no cancel control message; the reference resolves the
     // in-flight turn as cancelled and stops forwarding its remaining output. The

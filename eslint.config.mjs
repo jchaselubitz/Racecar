@@ -1,4 +1,5 @@
 import js from '@eslint/js';
+import globals from 'globals';
 import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
 
@@ -32,9 +33,13 @@ export default tseslint.config(
     },
   },
   {
-    // Config files are linted via the default project without full type info.
+    // Config files and node test fixtures are linted via the default project
+    // without full type info; they run under Node, so expose its globals.
     files: ['**/*.mjs', '**/*.config.ts'],
     extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: {
+      globals: globals.node,
+    },
   },
   prettier,
 );

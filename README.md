@@ -45,6 +45,11 @@ integrates later as one caller among many.
 Git is the durable source of truth for code. The sandbox filesystem is
 recoverable working state, never authoritative.
 
+Mission branches, synchronization, and integration are owned by Racecar while
+callers such as Overlord provide intent and consume a small status/resource
+contract. See [Git integration for mission sandboxes](planning/git-integration.md)
+for the configuration and ownership boundary.
+
 ## Architecture
 
 ```mermaid

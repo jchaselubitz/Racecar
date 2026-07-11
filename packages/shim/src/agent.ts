@@ -41,6 +41,16 @@ export interface AgentSession {
   readonly id: string;
   /** Run one prompt turn; resolve when it stops, with the stop reason. */
   prompt(content: readonly ContentBlock[]): Promise<PromptResponse>;
+  /**
+   * Deliver a user message *into the in-flight turn* — mid-run injection — if the
+   * agent's protocol supports it (the tier-1/tier-2 path). Returns `true` when the
+   * message was accepted into the running turn. A tier that cannot inject omits
+   * this method (or returns `false`), and the shim instead queues the message and
+   * prepends it to the next prompt (the tier-3, PTY-only, run-boundary path). It is
+   * only meaningful while a turn is in flight; with no turn running it returns
+   * `false` so the caller queues the message for the next turn.
+   */
+  inject?(content: readonly ContentBlock[]): boolean;
   /** Best-effort cancel of the in-flight turn (maps to `session/cancel`). */
   cancel(): void;
   /** Release any resources; called when the client disconnects. */

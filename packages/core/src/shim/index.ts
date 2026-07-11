@@ -11,5 +11,6 @@ export {
   generateShimToken,
   shimBootScript,
   shimStatusScript,
+  shimTokenScript,
   type ShimBootParams,
 } from './launch.js';

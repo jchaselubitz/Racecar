@@ -18,6 +18,14 @@ import { EchoAgent, type AgentFactory } from './agent.js';
 import { JsonRpcPeer } from './jsonrpc.js';
 import { authenticate, tokenSubprotocol } from './token.js';
 
+/** A per-connection binding the server tears down when the socket closes. */
+export interface Connection {
+  close(): void;
+}
+
+/** Binds a fresh JSON-RPC peer to whatever serves it (an ACP agent, a run store). */
+export type ConnectionHandler = (peer: JsonRpcPeer) => Connection;
+
 /** Options for a {@link ShimServer}. */
 export interface ShimServerOptions {
   /** Per-sandbox token every connection must present. */
@@ -26,6 +34,13 @@ export interface ShimServerOptions {
   readonly port: number;
   /** Interface to bind; defaults to all interfaces. */
   readonly host?: string;
+  /**
+   * Bind each connection to its server. Defaults to a per-connection
+   * {@link AcpAgentServer} over {@link agentFactory} (the isolated-session path).
+   * The daemon overrides this to share one {@link RunRegistry} across connections
+   * so `racecar run` and `racecar chat` converge on the same run.
+   */
+  readonly connect?: ConnectionHandler;
   /** Produces the agent for each connection; defaults to {@link EchoAgent}. */
   readonly agentFactory?: AgentFactory;
   /** Structured log sink; defaults to no-op. */
@@ -44,7 +59,7 @@ export class ShimServer {
   readonly #token: string;
   readonly #host: string;
   readonly #port: number;
-  readonly #agentFactory: AgentFactory;
+  readonly #connect: ConnectionHandler;
   readonly #log: (event: ShimLogEvent) => void;
   readonly #http: Server;
   readonly #wss: WebSocketServer;
@@ -54,7 +69,8 @@ export class ShimServer {
     this.#token = options.token;
     this.#host = options.host ?? '0.0.0.0';
     this.#port = options.port;
-    this.#agentFactory = options.agentFactory ?? (() => new EchoAgent());
+    const agentFactory = options.agentFactory ?? (() => new EchoAgent());
+    this.#connect = options.connect ?? ((peer) => new AcpAgentServer(peer, agentFactory()));
     this.#log = options.onLog ?? (() => {});
     this.#http = createServer((_req, res) => {
       // The only supported route is the WebSocket upgrade; a plain GET is a
@@ -116,7 +132,7 @@ export class ShimServer {
     const peer = new JsonRpcPeer((message) => {
       if (ws.readyState === ws.OPEN) ws.send(message);
     });
-    const acp = new AcpAgentServer(peer, this.#agentFactory());
+    const connection = this.#connect(peer);
     this.#log({ level: 'info', msg: 'client connected', data: { total: this.#connections.size } });
 
     ws.on('message', (data: Buffer | ArrayBuffer | Buffer[]) => {
@@ -124,7 +140,7 @@ export class ShimServer {
     });
     const teardown = (): void => {
       if (!this.#connections.delete(ws)) return;
-      acp.close();
+      connection.close();
       peer.close('client disconnected');
       this.#log({
         level: 'info',

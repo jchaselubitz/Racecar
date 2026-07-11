@@ -1,202 +1,161 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { EchoAgent, RunAgentServer, RunRegistry, ShimServer, type CaptureGit } from '@racecar/shim';
 import { FakeSandboxProvider, type FakeExecHandler } from '@racecar/core/testing';
-import { listRuns, RunBusyError, startRun } from './run.js';
+import type { PreviewUrl } from '@racecar/core';
+import { listRuns, startRun, statusFromStopReason } from './run.js';
 
-const b64 = (v: string): string => Buffer.from(v, 'utf8').toString('base64');
+const TOKEN = 'run-test-token';
 
-/** A record blob in the read-back protocol {@link parseRunRecords} expects. */
-function runBlock(fields: {
-  id: string;
-  meta: { startedAt: string } & Record<string, unknown>;
-  status: string;
-  exit?: string;
-  ended?: string;
-  gitstatus?: string;
-  gitdiff?: string;
-}): string {
-  return [
-    '==RUN==',
-    `id:${fields.id}`,
-    `meta:${b64(JSON.stringify(fields.meta))}`,
-    `started:${fields.meta.startedAt}`,
-    `status:${fields.status}`,
-    `exit:${fields.exit ?? ''}`,
-    `ended:${fields.ended ?? ''}`,
-    `gitstatus:${b64(fields.gitstatus ?? '')}`,
-    `gitdiff:${b64(fields.gitdiff ?? '')}`,
-    '',
-  ].join('\n');
+/** A fake provider whose preview URL points at a real local shim server. */
+class ShimBackedProvider extends FakeSandboxProvider {
+  readonly #url: string;
+  constructor(url: string, execHandler: FakeExecHandler) {
+    super({ execHandler });
+    this.#url = url;
+  }
+  override getPreviewUrl(): Promise<PreviewUrl> {
+    return Promise.resolve({ url: this.#url });
+  }
+}
+
+/** Exec handler that serves the shim token and nothing else. */
+const tokenExec: FakeExecHandler = (_id, request) =>
+  request.command.includes('RACECAR_SHIM_TOKEN')
+    ? { exitCode: 0, output: TOKEN }
+    : { exitCode: 0, output: '' };
+
+let servers: ShimServer[] = [];
+
+afterEach(async () => {
+  await Promise.all(servers.map((s) => s.close()));
+  servers = [];
+});
+
+/** Start a shim server backed by a shared run registry (EchoAgent by default). */
+async function startShim(captureGit?: CaptureGit): Promise<{ url: string }> {
+  const registry = new RunRegistry({
+    agent: new EchoAgent(),
+    ...(captureGit ? { captureGit } : {}),
+  });
+  const server = new ShimServer({
+    token: TOKEN,
+    port: 0,
+    host: '127.0.0.1',
+    connect: (peer) => new RunAgentServer(peer, registry),
+  });
+  servers.push(server);
+  const { port } = await server.listen();
+  return { url: `http://127.0.0.1:${port}` };
 }
 
 async function seed(provider: FakeSandboxProvider): Promise<string> {
   await provider.buildSnapshot({ name: 'snap', baseImage: 'node:22' });
-  const sandbox = await provider.createSandbox({ snapshot: 'snap' });
-  return sandbox.id;
+  return (await provider.createSandbox({ snapshot: 'snap' })).id;
 }
 
-/** Classify a script by a distinctive substring so a handler can respond to it. */
-function kind(command: string): 'read' | 'status' | 'lock' | 'launch' | 'other' {
-  if (command.includes('==RUN==')) return 'read';
-  if (command.startsWith('cat') && command.includes('.status')) return 'status';
-  if (command.includes('mkdir') && command.includes('run.lock.d')) return 'lock';
-  if (command.includes('send-keys')) return 'launch';
-  return 'other';
-}
-
-describe('startRun', () => {
-  it('acquires the lock and launches the agent detached, returning the run id', async () => {
-    const commands: string[] = [];
-    const handler: FakeExecHandler = (_id, request) => {
-      commands.push(request.command);
-      if (kind(request.command) === 'lock') return { exitCode: 0, output: 'ACQUIRED\n' };
-      return { exitCode: 0, output: '' };
-    };
-    const provider = new FakeSandboxProvider({ execHandler: handler });
-    const id = await seed(provider);
-
-    const result = await startRun(provider, id, 'do the thing', {
-      workspaceDir: '/home/daytona/workspace',
-    });
-
-    expect(result.meta.id).toMatch(/^run-/);
-    expect(result.meta.agent).toBe('claude-code');
-    expect(result.record).toBeUndefined();
-    // The lock was claimed and a run launched inside tmux.
-    expect(commands.some((c) => kind(c) === 'lock')).toBe(true);
-    expect(commands.some((c) => kind(c) === 'launch')).toBe(true);
-  });
-
-  it('refuses to start when another run holds the lock', async () => {
-    const provider = new FakeSandboxProvider({
-      execHandler: (_id, request) =>
-        kind(request.command) === 'lock'
-          ? { exitCode: 0, output: 'BUSY:run-existing\n' }
-          : { exitCode: 0, output: '' },
-    });
-    const id = await seed(provider);
-
-    await expect(startRun(provider, id, 'prompt', { workspaceDir: '/w' })).rejects.toBeInstanceOf(
-      RunBusyError,
-    );
-  });
-
-  it('starts a stopped sandbox before running', async () => {
-    const provider = new FakeSandboxProvider({
-      execHandler: (_id, request) =>
-        kind(request.command) === 'lock'
-          ? { exitCode: 0, output: 'ACQUIRED\n' }
-          : { exitCode: 0, output: '' },
-    });
-    const id = await seed(provider);
-    await provider.stopSandbox(id);
-
-    await startRun(provider, id, 'prompt', { workspaceDir: '/w' });
-    expect((await provider.getSandbox(id))?.state).toBe('started');
-  });
-
-  it('waits for a run to finish and returns its recorded result', async () => {
-    const statuses = ['running', 'running', 'succeeded'];
-    let polls = 0;
-    const provider = new FakeSandboxProvider({
-      execHandler: (_id, request) => {
-        switch (kind(request.command)) {
-          case 'lock':
-            return { exitCode: 0, output: 'ACQUIRED\n' };
-          case 'status':
-            return { exitCode: 0, output: `${statuses[Math.min(polls++, statuses.length - 1)]}\n` };
-          case 'read':
-            return {
-              exitCode: 0,
-              output: runBlock({
-                id: 'run-fixed',
-                meta: {
-                  id: 'run-fixed',
-                  sandboxId: 's',
-                  agent: 'claude-code',
-                  prompt: 'p',
-                  startedAt: '2026-07-10T00:00:00Z',
-                },
-                status: 'succeeded',
-                exit: '0',
-                ended: '2026-07-10T00:01:00Z',
-                gitstatus: ' M a.ts',
-                gitdiff: ' a.ts | 1 +',
-              }),
-            };
-          default:
-            return { exitCode: 0, output: '' };
-        }
-      },
-    });
-    const id = await seed(provider);
-
-    const result = await startRun(provider, id, 'prompt', {
-      workspaceDir: '/w',
-      wait: true,
-      pollMs: 1,
-    });
-
-    expect(result.timedOut).toBeUndefined();
-    expect(result.record?.status).toBe('succeeded');
-    expect(result.record?.exitCode).toBe(0);
-    expect(result.record?.gitDiffStat).toContain('a.ts');
-  });
-
-  it('reports a timeout when a run does not finish in time', async () => {
-    const provider = new FakeSandboxProvider({
-      execHandler: (_id, request) =>
-        kind(request.command) === 'lock'
-          ? { exitCode: 0, output: 'ACQUIRED\n' }
-          : kind(request.command) === 'status'
-            ? { exitCode: 0, output: 'running\n' }
-            : { exitCode: 0, output: '' },
-    });
-    const id = await seed(provider);
-
-    const result = await startRun(provider, id, 'prompt', {
-      workspaceDir: '/w',
-      wait: true,
-      pollMs: 1,
-      waitTimeoutSeconds: 0,
-    });
-    expect(result.timedOut).toBe(true);
-    expect(result.record).toBeUndefined();
+describe('statusFromStopReason', () => {
+  it('maps stop reasons to run statuses', () => {
+    expect(statusFromStopReason('end_turn')).toBe('succeeded');
+    expect(statusFromStopReason('max_tokens')).toBe('succeeded');
+    expect(statusFromStopReason('refusal')).toBe('failed');
+    expect(statusFromStopReason('cancelled')).toBe('cancelled');
   });
 });
 
-describe('listRuns', () => {
-  it('parses recorded runs from a started sandbox', async () => {
-    const provider = new FakeSandboxProvider({
-      execHandler: (_id, request) =>
-        kind(request.command) === 'read'
-          ? {
-              exitCode: 0,
-              output: runBlock({
-                id: 'run-1',
-                meta: {
-                  id: 'run-1',
-                  sandboxId: 's',
-                  agent: 'claude-code',
-                  prompt: 'p',
-                  startedAt: '2026-07-10T00:00:00Z',
-                },
-                status: 'failed',
-                exit: '2',
-                ended: '2026-07-10T00:02:00Z',
-              }),
-            }
-          : { exitCode: 0, output: '' },
-    });
+describe('startRun through the shim', () => {
+  it('creates a run, streams the reply, and records the result', async () => {
+    const { url } = await startShim();
+    const provider = new ShimBackedProvider(url, tokenExec);
     const id = await seed(provider);
+
+    const updates: string[] = [];
+    const result = await startRun(provider, id, 'do the thing', {
+      workspaceDir: '/workspace',
+      onUpdate: (update) => {
+        if (update.sessionUpdate === 'agent_message_chunk' && update.content.type === 'text') {
+          updates.push(update.content.text);
+        }
+      },
+    });
+
+    expect(result.timedOut).toBeUndefined();
+    expect(result.record.runId).toMatch(/^run-/);
+    expect(result.record.status).toBe('succeeded');
+    expect(result.record.stopReason).toBe('end_turn');
+    expect(updates).toEqual(['echo: do the thing']);
+  });
+
+  it('records the git summary the shim captured at turn end', async () => {
+    const captureGit: CaptureGit = () =>
+      Promise.resolve({ gitStatus: ' M x.ts', gitDiffStat: ' x.ts | 3 +' });
+    const { url } = await startShim(captureGit);
+    const provider = new ShimBackedProvider(url, tokenExec);
+    const id = await seed(provider);
+
+    const result = await startRun(provider, id, 'edit x', { workspaceDir: '/workspace' });
+    expect(result.record.gitStatus).toBe(' M x.ts');
+    expect(result.record.gitDiffStat).toBe(' x.ts | 3 +');
+  });
+
+  it('starts a stopped sandbox before running', async () => {
+    const { url } = await startShim();
+    const provider = new ShimBackedProvider(url, tokenExec);
+    const id = await seed(provider);
+    await provider.stopSandbox(id);
+
+    await startRun(provider, id, 'go', { workspaceDir: '/w' });
+    expect((await provider.getSandbox(id))?.state).toBe('started');
+  });
+
+  it('reports a timeout while leaving the run in the shim', async () => {
+    // A registry whose agent never resolves a turn, so the wait times out.
+    const registry = new RunRegistry({
+      agent: {
+        capabilities: {},
+        newSession: () => ({
+          id: 'hang',
+          prompt: () => new Promise(() => {}),
+          cancel: () => {},
+          close: () => {},
+        }),
+      },
+    });
+    const server = new ShimServer({
+      token: TOKEN,
+      port: 0,
+      host: '127.0.0.1',
+      connect: (peer) => new RunAgentServer(peer, registry),
+    });
+    servers.push(server);
+    const { port } = await server.listen();
+    const provider = new ShimBackedProvider(`http://127.0.0.1:${port}`, tokenExec);
+    const id = await seed(provider);
+
+    const result = await startRun(provider, id, 'go', {
+      workspaceDir: '/w',
+      waitTimeoutSeconds: 0,
+    });
+    expect(result.timedOut).toBe(true);
+    expect(result.record.status).toBe('running');
+  });
+});
+
+describe('listRuns through the shim', () => {
+  it('lists recorded runs from a started sandbox', async () => {
+    const { url } = await startShim();
+    const provider = new ShimBackedProvider(url, tokenExec);
+    const id = await seed(provider);
+    await startRun(provider, id, 'first task', { workspaceDir: '/w' });
 
     const records = await listRuns(provider, id);
     expect(records).toHaveLength(1);
-    expect(records[0]?.status).toBe('failed');
-    expect(records[0]?.exitCode).toBe(2);
+    expect(records[0]?.title).toBe('first task');
+    expect(records[0]?.status).toBe('succeeded');
   });
 
   it('returns nothing for a stopped sandbox', async () => {
-    const provider = new FakeSandboxProvider();
+    const { url } = await startShim();
+    const provider = new ShimBackedProvider(url, tokenExec);
     const id = await seed(provider);
     await provider.stopSandbox(id);
     expect(await listRuns(provider, id)).toEqual([]);

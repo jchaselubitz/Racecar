@@ -72,7 +72,7 @@ function resolveAgent(env: NodeJS.ProcessEnv): AgentSelection {
 }
 
 function isAgentKind(value: string | undefined): value is ShimAgentKind {
-  return value !== undefined && (SHIM_AGENT_KINDS as readonly string[]).includes(value);
+  return value !== undefined && SHIM_AGENT_KINDS.some((kind) => kind === value);
 }
 
 function nonEmpty(value: string | undefined): string | undefined {
@@ -89,8 +89,8 @@ function parseArgs(value: string | undefined): readonly string[] | undefined {
   if (raw === undefined) return undefined;
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.every((item) => typeof item === 'string')) {
-      return parsed as string[];
+    if (Array.isArray(parsed) && parsed.every((item): item is string => typeof item === 'string')) {
+      return parsed;
     }
   } catch {
     // Not JSON; fall through to whitespace splitting.

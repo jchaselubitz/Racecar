@@ -57,6 +57,14 @@ export const SHIM_SUBPROTOCOL_PREFIX = 'racecar-shim-token.';
 export const SHIM_TMUX_SESSION = 'racecar-shim';
 
 /**
+ * The tmux session `racecar attach` connects to. The shim mirrors a run's
+ * transcript into a window here so a PTY attach and an ACP `racecar chat` view the
+ * same conversation. Must match core's `TMUX_SESSION`; duplicated so the shim
+ * bundle needs no `@racecar/core` dependency.
+ */
+export const RUN_TMUX_SESSION = 'racecar';
+
+/**
  * Env var selecting which southbound agent the shim drives: one of
  * {@link SHIM_AGENT_KINDS}. Injected at sandbox boot alongside the token. Absent
  * or unknown falls back to {@link SHIM_DEFAULT_AGENT} (the built-in echo stub), so
@@ -81,6 +89,40 @@ export type ShimAgentKind = (typeof SHIM_AGENT_KINDS)[number];
 
 /** Default when {@link SHIM_AGENT_ENV} is unset: the in-process echo stub. */
 export const SHIM_DEFAULT_AGENT: ShimAgentKind = 'echo';
+
+/**
+ * The southbound integration tier of an agent — the "capability flags on the
+ * agent recipe" the README describes — which decides how the mailbox delivers a
+ * user→agent message to it:
+ *
+ *  - **1 — native ACP** (`claude-code`, `codex`): full mid-run chat; a queued
+ *    instruction is injected into the in-flight turn.
+ *  - **2 — bridge** (`stream-json`): a structured streaming interface the shim
+ *    translates; injection rides the same streaming-input channel.
+ *  - **3 — PTY-only**: a plain CLI with no injection channel; mailbox messages
+ *    queue and are prepended to the *next* run's prompt at the run boundary.
+ *
+ * Tiers 1 and 2 support mid-run injection; tier 3 does not. The runtime keys the
+ * actual delivery off whether the live {@link '../agent.js'.AgentSession} exposes
+ * an `inject` method, so this table is the declared, observable counterpart used
+ * for logging and to reason about a kind before a session exists. `echo` is the
+ * in-process stub; it is nominally native but completes synchronously, so it never
+ * has a live turn to inject into and always takes the run-boundary path.
+ */
+export const SHIM_AGENT_TIERS: Record<ShimAgentKind, DeliveryTier> = {
+  echo: 1,
+  'claude-code': 1,
+  codex: 1,
+  'stream-json': 2,
+};
+
+/** A southbound delivery tier (see {@link SHIM_AGENT_TIERS}). */
+export type DeliveryTier = 1 | 2 | 3;
+
+/** The declared {@link DeliveryTier} of an agent kind. */
+export function deliveryTierOf(kind: ShimAgentKind): DeliveryTier {
+  return SHIM_AGENT_TIERS[kind];
+}
 
 /**
  * Default launch command per agent kind. The real binaries live *inside the
