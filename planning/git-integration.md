@@ -138,26 +138,153 @@ new remote head and treats it like any other default-branch advancement.
 Protected repositories should enforce that automated updates use the queue or
 pull-request path.
 
-## Integration states
+## Integration state machine
 
-The Racecar state machine should distinguish at least:
+Racecar records integration state per `resourceKey`. The happy path is:
 
 ```text
 working -> delivered -> queued -> rebasing -> testing -> merged
-                |          |          |           |
-                |          |          +---------> conflict
-                |          +--------------------> superseded
-                +-------------------------------> awaiting_approval
-                                      testing --> checks_failed
 ```
+
+The terminal or user-action exits are:
+
+```text
+delivered -> awaiting_approval -> queued
+queued    -> superseded
+rebasing  -> conflict
+testing   -> checks_failed
+any open state -> superseded
+```
+
+State meanings:
+
+| State | Meaning | Owner of next action |
+| --- | --- | --- |
+| `working` | A mission sandbox exists or is expected to exist, and the branch may still receive commits. Racecar tracks `baseSha`, the mission branch, and the observed default branch head. | Sandbox/agent |
+| `delivered` | The sandbox has pushed a concrete candidate commit and reported `headSha`. This does not imply it is safe or approved to merge. | Racecar policy or user |
+| `awaiting_approval` | Project policy requires a human or caller decision before enqueuing the delivered candidate. | User/Overlord caller |
+| `queued` | Racecar has accepted an immutable queue entry for a specific `headSha`. | Integration coordinator |
+| `rebasing` | The coordinator is applying the queued candidate onto the current default branch in a disposable integration checkout. | Integration coordinator |
+| `testing` | The candidate applied cleanly and the configured checks are running against the post-rebase commit. | Integration coordinator/check runner |
+| `merged` | The candidate, or a traceable rebased/squashed descendant, landed on the default branch. Racecar records `mergedSha`. | None |
+| `conflict` | Rebase or merge application failed. The owning sandbox must resolve and push a new `headSha`. | Sandbox/agent |
+| `checks_failed` | The candidate applied cleanly but required checks failed. The owning sandbox must fix and push a new `headSha`, or a user must explicitly waive if project policy allows it. | Sandbox/agent or user |
+| `superseded` | A newer delivery or explicit cancellation replaced this candidate. The old queue entry remains auditable but can never merge. | None |
 
 `delivered` is an agent/objective outcome. `merged` is a Git integration
 outcome. A mission is integrated only when its delivered SHA, or a traceable
-rebased descendant of it, lands on the default branch.
+rebased/squashed descendant of it, lands on the default branch.
 
-Queue entries are immutable and contain the candidate SHA. A later delivery
-supersedes an older queued candidate for the same mission rather than silently
-changing what is being tested.
+The state machine is append-only from an audit perspective. A retry after
+`conflict` or `checks_failed` creates a new delivery/candidate at a new
+`headSha`; it does not mutate the failed queue entry.
+
+### Commit identity fields
+
+Racecar should carry these SHA fields on every integration resource:
+
+| Field | Set when | Meaning |
+| --- | --- | --- |
+| `baseSha` | Branch creation and every successful sandbox synchronization | Default-branch commit the mission branch currently claims as its base. |
+| `headSha` | Checkpoint push and delivery | Current pushed mission-branch commit. A delivered candidate must name this exact commit. |
+| `queueBaseSha` | Enqueue | Default-branch commit observed when the immutable queue entry was created. |
+| `rebasedSha` | Successful rebase/application | Candidate commit produced by applying `headSha` onto the latest default branch. Equal to `headSha` when no rebase was needed and the merge strategy preserves it. |
+| `mergedSha` | Successful default-branch update | Commit now reachable from the default branch that represents the candidate. For squash merges, this is the squash commit. For fast-forward merges, this may equal `rebasedSha` or `headSha`. |
+
+`baseSha`, `headSha`, and `mergedSha` are the minimum fields Overlord needs to
+display continuity. `queueBaseSha` and `rebasedSha` are Racecar-owned details
+that make the audit trail and retry behavior unambiguous.
+
+### Immutable queue entries
+
+The integration queue stores entries, not branch pointers. A queue entry is
+created once and never edited in place:
+
+```json
+{
+  "entryId": "intq_01J...",
+  "resourceKey": "app",
+  "missionId": "coo:252",
+  "objectiveId": "af7c2f72-24c7-425d-9b26-7a259d46d767",
+  "branch": "ovld/coo-252-git-management",
+  "baseSha": "abc123",
+  "headSha": "def456",
+  "queueBaseSha": "789abc",
+  "state": "queued",
+  "priority": "normal",
+  "createdAt": "2026-07-12T07:30:00.000Z",
+  "supersedesEntryId": null
+}
+```
+
+The coordinator may append derived observations to the entry record, such as
+`startedAt`, `checks`, `conflict`, `rebasedSha`, `mergedSha`, and `finishedAt`,
+but it must not change the identity fields that decide what code is being
+integrated: `resourceKey`, `missionId`, `branch`, `baseSha`, `headSha`, and
+`queueBaseSha`.
+
+If a mission delivers again while an earlier entry is `queued`, `rebasing`,
+`testing`, `conflict`, `checks_failed`, or `awaiting_approval`, Racecar creates a
+new entry and marks the previous nonterminal entry `superseded`. A superseded
+entry is not retried or merged even if its checks later pass.
+
+### Compare-and-swap default-branch update
+
+The integration coordinator is the only Racecar component that attempts to
+advance a default branch. It must update the remote ref with compare-and-swap
+semantics:
+
+1. Fetch the remote default branch and record `expectedMainSha`.
+2. Apply the immutable `headSha` onto `expectedMainSha` according to the project
+   merge strategy.
+3. Run required checks against the exact tree that would become the new default
+   branch.
+4. Re-read the remote default branch immediately before writing it.
+5. Advance the default branch only if it still equals `expectedMainSha`.
+6. If the compare-and-swap check fails, do not merge. Record
+   `default_branch_advanced`, notify affected sandboxes, and move the entry back
+   through `rebasing` against the new default branch unless it has been
+   superseded.
+
+For a direct Git remote, this is an atomic ref update with an expected old SHA.
+For a protected Git host, Racecar should use the provider's merge/PR API only if
+the provider can enforce the same expected-head condition or equivalent branch
+protection. Hosted checks may satisfy the `testing` state, but the final write
+still requires the compare-and-swap guard.
+
+### Sandbox notifications when main advances
+
+Whenever Racecar observes a new default-branch SHA for a resource, whether from
+its own merge or a human push, it publishes a `default_branch_advanced` event:
+
+```json
+{
+  "type": "default_branch_advanced",
+  "resourceKey": "app",
+  "defaultBranch": "main",
+  "previousSha": "789abc",
+  "newSha": "012def",
+  "source": "racecar-integration",
+  "mergedEntryId": "intq_01J...",
+  "occurredAt": "2026-07-12T07:35:00.000Z"
+}
+```
+
+Racecar delivers that event to every active sandbox for the same project
+resource:
+
+- idle clean sandboxes may be synchronized automatically, then their `baseSha`
+  is advanced;
+- active or dirty sandboxes receive a pending-main-update mailbox/control-plane
+  notification and keep working until the next safe objective boundary;
+- queued candidates behind the new default branch are reprocessed serially
+  against the new SHA before they can merge; and
+- Overlord receives the compact lifecycle resource update and may display a
+  warning, but it does not run Git synchronization itself.
+
+Notification delivery should be idempotent. A sandbox records the last
+`defaultBranchSha` it has acknowledged per `resourceKey`, so repeated events do
+not trigger repeated rebases.
 
 ## Minimal input from Overlord
 
@@ -192,6 +319,8 @@ multi-resource mission publishes one instance per modified repository resource:
   "branch": "ovld/coo-252-git-management",
   "baseSha": "abc123",
   "headSha": "def456",
+  "queueBaseSha": "789abc",
+  "rebasedSha": null,
   "deliveredSha": "def456",
   "integrationState": "queued",
   "defaultBranch": "main",
@@ -219,20 +348,48 @@ Racecar emits state-change events such as:
 - `checkpoint_pushed`
 - `default_branch_advanced`
 - `integration_queued`
+- `integration_rebasing`
+- `integration_testing`
 - `checks_failed`
 - `conflict_detected`
+- `integration_superseded`
 - `integration_merged`
 
 Overlord can translate these into mission activity, notifications, and UI.
 Commands shown in Overlord delegate back to Racecar rather than executing Git
-logic in Overlord. A prospective CLI surface is:
+logic in Overlord. The implemented CLI surface is:
 
 ```bash
-racecar integration enqueue --mission coo:252 --head def456
-racecar integration status --mission coo:252 --json
-racecar integration retry --mission coo:252
-racecar integration dequeue --mission coo:252
+racecar integration status --resource app --mission coo:252 --json
+racecar integration enqueue --resource app --mission coo:252 --head def456 --branch ovld/coo-252-git --json
+racecar integration approve --resource app --entry intq_01J... --json
+racecar integration retry --resource app --entry intq_01J... --head fed789 --json
+racecar integration dequeue --resource app --entry intq_01J... --json
+racecar integration run --resource app --once --json
 ```
+
+`--resource <key>` selects the repository resource (default `primary`); `--project`
+is accepted as an alias for it. The queue for a resource is persisted as
+`.racecar/integration/<resourceKey>.json`, and every mutation runs under a
+resource-scoped lock (`.racecar/integration/<resourceKey>.lock`).
+
+CLI contract rules:
+
+- Every command must support `--json` for gateway/Overlord callers and return a
+  stable object with `ok`, `resourceKey`, `state`, and either `entry` or
+  `resource`.
+- `enqueue` requires an exact `--head` SHA and fails if the mission branch does
+  not currently contain that commit. It returns the immutable `entryId`.
+- `approve` moves an `awaiting_approval` entry to `queued`; it does not choose a
+  different commit.
+- `retry` is syntactic sugar for creating a new immutable entry after
+  `conflict` or `checks_failed`. It requires the new pushed `--head` SHA and
+  records `supersedesEntryId`.
+- `dequeue` marks a nonterminal entry `superseded`; it does not delete the audit
+  record.
+- `run --once` processes at most one queue entry under a resource-scoped lock.
+  A future daemon may loop over the same primitive, but the single-step command
+  keeps the MVP debuggable.
 
 ## Continuity and concurrency
 
@@ -253,16 +410,26 @@ the new default-branch head.
 
 ## Delivery sequence
 
-1. Add `.racecar/config.yaml` parsing and validation, mission branch ownership,
-   checkpoint push, and base/head SHA tracking.
-2. Add a manual `racecar integration enqueue/status/retry/dequeue` workflow
-   backed by a resource-scoped lock and compare-and-swap default-branch update.
+1. **Implemented.** `.racecar/config.yaml` parsing and validation, mission-branch
+   naming, and base/head/queue SHA tracking. The pure policy resolver, state
+   machine, immutable queue, and event/resource projection live in the
+   `@racecar/core` integration module
+   (`packages/core/src/integration/`); the CLI loads the config in
+   `packages/cli/src/integration.ts`.
+2. **Implemented.** A manual `racecar integration enqueue/status/approve/retry/dequeue`
+   workflow plus `run --once`, backed by a resource-scoped lock, a JSON-persisted
+   immutable queue, and a compare-and-swap default-branch update
+   (`git update-ref` with an expected old SHA) performed in a disposable worktree
+   by `LocalGitOps`.
 3. Publish the integration resource and events through the existing Racecar to
-   Overlord execution gateway.
-4. Add the automated serial queue, safe idle-sandbox synchronization, overlap
-   warnings, and post-merge lifecycle cleanup.
+   Overlord execution gateway. (The resource shape and events exist as pure
+   projections; wiring them onto the gateway is the remaining step.)
+4. Add the automated serial queue (looping `run --once`), safe idle-sandbox
+   synchronization, overlap warnings, and post-merge lifecycle cleanup.
 5. Optionally add hosted or pull-request-backed integration and speculative
-   checks without changing the ownership contract.
+   checks without changing the ownership contract. `LocalGitOps` implements the
+   provider-neutral `IntegrationGitOps` interface, so a hosted/push-based
+   implementation slots in without touching the state machine or queue.
 
 The guiding rule is: **Racecar decides how code becomes mergeable; Overlord
 decides when the mission should ask Racecar to do it and presents the result.**

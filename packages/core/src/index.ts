@@ -22,6 +22,7 @@ export * from './cost/index.js';
 export * from './credentials/index.js';
 export * from './domain/index.js';
 export * from './firewall/index.js';
+export * from './integration/index.js';
 export * from './quota/index.js';
 export * from './labels/index.js';
 export * from './provider/index.js';

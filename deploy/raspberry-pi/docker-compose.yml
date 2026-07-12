@@ -1,0 +1,9 @@
+services:
+  racecar-gateway:
+    build:
+      context: ../..
+      dockerfile: deploy/railway/Dockerfile
+    env_file: .env
+    ports:
+      - '8080:8080'
+    restart: unless-stopped

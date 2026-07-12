@@ -1235,6 +1235,7 @@ __metadata:
   dependencies:
     "@racecar/core": "workspace:^"
     "@racecar/shim": "workspace:^"
+    yaml: "npm:^2.0.0"
   bin:
     racecar: ./dist/main.js
   languageName: unknown
@@ -1246,6 +1247,14 @@ __metadata:
   dependencies:
     "@daytona/sdk": "npm:^0.196.0"
     ws: "npm:^8.18.0"
+  languageName: unknown
+  linkType: soft
+
+"@racecar/gateway@workspace:packages/gateway":
+  version: 0.0.0-use.local
+  resolution: "@racecar/gateway@workspace:packages/gateway"
+  bin:
+    racecar-gateway: ./dist/main.js
   languageName: unknown
   linkType: soft
 

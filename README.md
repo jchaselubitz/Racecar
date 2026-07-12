@@ -148,6 +148,41 @@ explicit approval. Container sandboxes are the default class; "resume" of a
 stopped container is start-from-preserved-filesystem, never process resume.
 A per-project cap bounds concurrent active sandboxes.
 
+### Git integration
+
+Because missions run concurrently in isolated sandboxes, Racecar — not the
+caller — owns how a mission branch becomes part of `main`. Each mission owns one
+durable branch and pushes frequent checkpoint commits; a per-resource
+**integration queue** is the only automated writer to the default branch. The
+queue stores immutable entries (an exact `headSha`, never a moving branch
+pointer), and the coordinator advances the default branch with a compare-and-swap
+`git update-ref` so a concurrent push is detected rather than clobbered. Delivery
+and merge are separate states: a mission is _integrated_ only when its delivered
+SHA — or a traceable rebased/squashed descendant — lands on the default branch.
+
+A candidate moves `working → delivered → queued → rebasing → testing → merged`,
+with `awaiting_approval`, `conflict`, `checks_failed`, and `superseded` exits. On
+a conflict or a failed check the candidate is returned to its owning sandbox to
+fix and re-enqueue at a fresh head; retries never mutate the failed entry, so the
+queue is an append-only audit trail. Policy lives with the project in
+`.racecar/config.yaml` (branch naming, checkpoint cadence, merge strategy,
+required checks, approval gate).
+
+```bash
+racecar integration enqueue --mission coo:252 --head <sha> [--branch <name>] [--resource <key>]
+racecar integration status  [--resource <key>] [--mission <id>] [--entry <id>]
+racecar integration approve --entry <id>              # awaiting_approval → queued
+racecar integration retry   --entry <id> --head <sha> # new entry after conflict/checks_failed
+racecar integration dequeue --entry <id>              # cancel (marks superseded)
+racecar integration run --once [--resource <key>]     # process one candidate under CAS
+```
+
+Every command accepts `--json`, returning a stable `{ ok, resourceKey, state, entry|resource }`
+object for gateway/Overlord callers. The full state machine, SHA-identity fields,
+immutable-queue semantics, and the minimal contract Racecar exposes to Overlord
+are specified in
+[Git integration for mission sandboxes](planning/git-integration.md).
+
 ## Design principles
 
 - **Overlord-shaped, not generic.** The domain model (project / mission

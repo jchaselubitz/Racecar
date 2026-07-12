@@ -1,0 +1,35 @@
+contractVersion: '4'
+componentType: rest-consumer
+componentKey: racecar
+label: 'Racecar Virtual Target Gateway'
+description: 'Long-lived Racecar gateway that claims Overlord virtual-target work and reports launch observations.'
+restConsumer:
+  authMechanisms: [bearer-token]
+  vendoredContractPath: packages/gateway/src/overlord-contract.ts
+  upstreamContractRef: packages/contract/src/index.ts@d158f7d1b51f5789e4f8f5d147c130fe6eacdcf6
+  endpoints:
+    - { method: PUT, path: /api/virtual-targets/v1/registration }
+    - { method: POST, path: /api/virtual-targets/v1/claim }
+    - { method: POST, path: /api/virtual-targets/v1/requests/:id/progress }
+    - { method: POST, path: /api/virtual-targets/v1/requests/:id/launched }
+    - { method: POST, path: /api/virtual-targets/v1/requests/:id/failed }
+  exportedTypes:
+    [
+      VirtualExecutionQueueItemV1,
+      VirtualTargetRegistrationBody,
+      VirtualTargetClaimResponseDto,
+      VirtualTargetProgressObservationBody,
+      VirtualTargetLaunchObservationV1,
+      VirtualTargetFailureV1,
+    ]
+vocabularyExtensions:
+  - {
+      vocabulary: execution_target_registrations.gateway_key,
+      value: racecar,
+      description: 'Racecar gateway adapter key.',
+    }
+  - {
+      vocabulary: execution_requests.failure_code,
+      value: 'racecar:launch_failed',
+      description: 'Racecar launch adapter failure.',
+    }

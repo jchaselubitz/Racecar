@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@racecar/core": "workspace:^",
-    "@racecar/shim": "workspace:^"
+    "@racecar/shim": "workspace:^",
+    "yaml": "^2.0.0"
   }
 }
