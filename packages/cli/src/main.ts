@@ -125,7 +125,9 @@ async function readJson<T>(path: string, description: string): Promise<T> {
 }
 
 async function loadProject(name: string): Promise<Project> {
-  return readJson<Project>(statePath(PROJECTS_DIR, `${name}.json`), `project '${name}'`);
+  // Normalize legacy project files so snapshots gain the primary resource even
+  // when they were created before multi-resource layouts existed.
+  return defineProject(await readJson<Project>(statePath(PROJECTS_DIR, `${name}.json`), `project '${name}'`));
 }
 
 async function loadSnapshot(project: string): Promise<Snapshot> {
@@ -273,12 +275,24 @@ async function projectInit(args: readonly string[]): Promise<void> {
   const defaultBranch = option(parsed, 'branch') ?? (git('branch', '--show-current') || 'main');
   const name = option(parsed, 'name') ?? resolve(process.cwd()).split('/').pop() ?? 'project';
   const workspaceDir = option(parsed, 'workspace-dir');
+  const resourcesJson = option(parsed, 'resources-json');
+  const resources =
+    resourcesJson === undefined
+      ? undefined
+      : (() => {
+          const value: unknown = JSON.parse(resourcesJson);
+          if (!Array.isArray(value) || value.some((entry) => entry === null || typeof entry !== 'object')) {
+            throw new Error('--resources-json must be an array of { key, repoUrl, branch } objects');
+          }
+          return value as { key: string; repoUrl: string; branch: string }[];
+        })();
   const project = defineProject({
     name,
     repoUrl,
     snapshot: option(parsed, 'snapshot') ?? `${name}-snapshot`,
     defaultBranch,
     ...(workspaceDir !== undefined ? { workspaceDir } : {}),
+    ...(resources !== undefined ? { resources } : {}),
     ...(parsed.options.has('auto-rebuild-snapshot') ? { autoRebuildSnapshot: true } : {}),
     egressAllowlist: parseEgressAllowlist(option(parsed, 'egress-allowlist')),
   });
@@ -305,7 +319,15 @@ async function snapshotBuild(args: readonly string[]): Promise<void> {
     baseImage: option(parsed, 'base-image') ?? DEFAULT_IMAGE,
     // Bake tmux into the image: every run executes inside a named tmux session
     // and `racecar attach` connects to it, so tmux must be present at boot.
-    setupCommands: [...TMUX_SETUP_COMMANDS, 'corepack enable'],
+    setupCommands: [
+      ...TMUX_SETUP_COMMANDS,
+      'corepack enable',
+      ...project.resources.flatMap((resource) => [
+        `rm -rf ${shellQuote(resource.workspaceDir)}`,
+        `git clone --branch ${shellQuote(resource.branch)} --single-branch ${shellQuote(resource.repoUrl)} ${shellQuote(resource.workspaceDir)}`,
+      ]),
+      `cd ${shellQuote(project.workspaceDir)} && yarn install --immutable`,
+    ],
     onLog: (chunk) => process.stderr.write(chunk),
   });
   const snapshot: Snapshot = {
@@ -314,10 +336,28 @@ async function snapshotBuild(args: readonly string[]): Promise<void> {
     baseImage: option(parsed, 'base-image') ?? DEFAULT_IMAGE,
     ...(currentHash !== undefined ? { lockfileHash: currentHash } : {}),
     ...(built.imageName !== undefined ? { imageName: built.imageName } : {}),
+    resourcePaths: Object.fromEntries(project.resources.map((resource) => [resource.key, resource.workspaceDir])),
     state: built.state,
     createdAt: new Date().toISOString(),
   };
   await writeJson(statePath(SNAPSHOTS_DIR, `${project.name}.json`), snapshot);
+  const overlordProjectId = process.env.OVERLORD_PROJECT_ID;
+  if (overlordProjectId !== undefined) {
+    for (const resource of project.resources) {
+      execFileSync(
+        'ovld',
+        [
+          'add-cwd',
+          '--directory',
+          resource.workspaceDir,
+          '--project-id',
+          overlordProjectId,
+          `--primary=${resource.primary ? 'true' : 'false'}`,
+        ],
+        { stdio: 'inherit' },
+      );
+    }
+  }
   report(
     'snapshot.built',
     { snapshot: snapshot.name, state: snapshot.state },
@@ -412,8 +452,12 @@ async function sandboxCreate(args: readonly string[]): Promise<void> {
   const checkout = [
     'set -eu',
     ...injection.setupCommands,
-    `rm -rf ${dir}`,
-    `git clone --branch ${shellQuote(branch)} --single-branch ${shellQuote(project.repoUrl)} ${dir}`,
+    // The snapshot owns the complete resource layout.  A sandbox may advance
+    // only its primary working tree to the requested mission branch; recloning
+    // here would discard siblings and make the registered Overlord paths vary
+    // by sandbox instance.
+    `git -C ${dir} fetch origin ${shellQuote(branch)}`,
+    `git -C ${dir} checkout --force -B ${shellQuote(branch)} FETCH_HEAD`,
     `cd ${dir}`,
     'corepack enable',
     'yarn install --immutable',

@@ -10,5 +10,10 @@
     "build": "tsc --build",
     "start": "node ./dist/main.js",
     "test": "vitest run"
+  },
+  "dependencies": {
+    "@racecar/cli": "workspace:^",
+    "@racecar/core": "workspace:^",
+    "@racecar/shim": "workspace:^"
   }
 }

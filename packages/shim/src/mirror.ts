@@ -34,6 +34,8 @@ export function renderTranscriptLine(update: SessionUpdate): string | undefined 
       return update.content.type === 'text' ? `> ${update.content.text}` : undefined;
     case 'tool_call':
       return `[tool ${update.status}] ${update.title}`;
+    case 'agent_question':
+      return `[question] ${update.question}`;
     default:
       return undefined;
   }

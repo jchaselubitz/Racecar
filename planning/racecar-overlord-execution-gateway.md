@@ -2,6 +2,26 @@
 
 ## Status
 
+> **⚠️ Partially superseded by
+> [`gateway-runner-reuse.md`](gateway-runner-reuse.md).** The
+> registration/claim/health mechanism this document assumes — the gateway
+> registering and heartbeating as a bespoke Overlord execution target over the
+> `/api/virtual-targets/v1/*` surface, and reporting claim/launch/failure and
+> health states through it — **was never built server-side** (only DTOs and
+> unused DB migrations landed in Overlord, commit `93dd8a1a`, contract v3). The
+> gateway is now an always-on **plain Overlord local runner**: it self-provisions
+> via an ordinary `USER_TOKEN` + stable device fingerprint, claims work through
+> the already-built `POST /api/runner/claim` / `.../launching` / `.../launched` /
+> `.../failed` lifecycle, drives the mission with `ovld protocol *`, and connects
+> to each sandbox's ACP shim instead of spawning a launch command. Treat sections
+> tagged **[Superseded]** below as historical.
+>
+> **Still correct and retained:** the domain model — one car per Overlord
+> mission, one run per objective, the identity mapping, multi-resource project
+> handling, the terminal architecture (one tmux session in the car), the
+> Git/repository ownership boundaries, and the security boundaries. Those are
+> unchanged; `gateway-runner-reuse.md` builds directly on them.
+
 Proposed architecture for integrating Racecar with Overlord while preserving
 Racecar as an independently usable, backend-free CLI and library.
 
@@ -90,6 +110,14 @@ know how many Racecar cars exist behind that target.
 The gateway is an always-online process running on a Raspberry Pi, VPS, home
 server, managed worker, or similar host. It owns:
 
+> **[Superseded — registration/heartbeat]** "Registration and heartbeat as an
+> Overlord execution target" is replaced by plain runner self-provisioning: the
+> gateway simply authenticates with a `USER_TOKEN` + stable device fingerprint,
+> and `ensureActingDeviceTarget` creates/reuses its target on first call. There
+> is no bespoke registration or heartbeat endpoint to call. Liveness/wake-up is
+> handled via `GET /api/runner/status?projectId=X`. See
+> [`gateway-runner-reuse.md`](gateway-runner-reuse.md).
+
 - Registration and heartbeat as an Overlord execution target.
 - Claiming execution requests assigned to that target.
 - Holding Racecar/provider credentials and authorized Git credential references.
@@ -170,6 +198,17 @@ request. If no gateway is online, Overlord leaves the request queued and reports
 that it is waiting for its execution target.
 
 ## Execution flow
+
+> **[Superseded — wire mechanism only]** The sequence of *what happens* (claim →
+> resolve resources → ensure project/snapshot/car → check out branch → mark
+> launching → start run → mark launched → agent attaches → delivery) is retained,
+> but the transport changes: claim and the launching/launched transitions ride
+> the plain `/api/runner/*` lifecycle, and "the agent attaches directly to
+> Overlord" is now done **by the gateway on the mission's behalf** via `ovld
+> protocol attach`/`update`/`deliver` over the sandbox's ACP shim connection —
+> the sandbox has no installed Overlord connector of its own. See
+> [`gateway-runner-reuse.md`](gateway-runner-reuse.md), "Driving the mission
+> lifecycle remotely."
 
 1. The user selects the gateway execution target and launches an objective.
 2. Overlord creates its normal durable execution request.
@@ -622,6 +661,17 @@ at most one active run per car unless a later explicit concurrency mode is added
 
 ## Health and availability
 
+> **[Superseded — health-state surface]** The health states below
+> (`ready`/`degraded`/`waiting_for_gateway`/`configuration_error`/
+> `provider_unavailable`) were meant to be reported over the bespoke
+> virtual-target health surface, which was never built. There is no
+> Overlord-side health/heartbeat endpoint for the plain runner; the gateway's
+> own always-on loop uses `GET /api/runner/status?projectId=X` to notice queued
+> work and wake stopped sandboxes. These states may still be useful as
+> gateway-internal diagnostics, but they are not an Overlord wire contract. See
+> [`gateway-runner-reuse.md`](gateway-runner-reuse.md), "Waking a stopped
+> sandbox."
+
 The gateway reports both host reachability and adapter health. Suggested states:
 
 - `ready`: gateway, Racecar, credentials, and provider are usable.
@@ -701,6 +751,16 @@ Launching agent
 
 ## Overlord contract impact
 
+> **[Superseded]** The premise of this section — that the architecture requires
+> new Overlord Runner/REST/Database/UI contract work (a new execution-target
+> capability, gateway registration/health semantics, a runner-side execution
+> adapter boundary) — no longer holds. `gateway-runner-reuse.md` requires **zero
+> Overlord-side changes**: it reuses the already-built device self-provisioning
+> and `/api/runner/*` claim lifecycle. If the implementation plan finds something
+> that seems to need an Overlord-side change, that is a blocker to flag, not
+> scope to build here. See [`gateway-runner-reuse.md`](gateway-runner-reuse.md),
+> "Explicit non-goals for this plan."
+
 Implementing this architecture crosses Overlord's Runner, REST, Database, and UI
 boundaries and must be specified in Overlord's component contract before code is
 added. Expected contract work includes:
@@ -718,6 +778,13 @@ Racecar should integrate only through documented Overlord REST, queue, and
 protocol surfaces. It must not access Overlord's database directly.
 
 ## Recommended delivery sequence
+
+> **[Superseded — step 5]** "Define the Overlord virtual-target and gateway
+> contract" is dropped: there is no new Overlord contract to define. The
+> equivalent step is now "pin a stable device fingerprint and stand up the plain
+> runner claim loop," per [`gateway-runner-reuse.md`](gateway-runner-reuse.md).
+> The remaining steps (Racecar CLI contract, snapshot/car/run ensure operations,
+> terminal proxying, hardening) still apply.
 
 1. Stabilize Racecar's machine-readable, non-interactive CLI contract.
 2. Add explicit Racecar state-root configuration and external IDs.

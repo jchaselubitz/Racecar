@@ -59,6 +59,8 @@ export function renderChatUpdate(
         : undefined;
     case 'tool_call':
       return { text: `\n[tool ${update.status}] ${update.title}`, newline: true };
+    case 'agent_question':
+      return { text: `\n[question] ${update.question}`, newline: true };
     default:
       return undefined;
   }

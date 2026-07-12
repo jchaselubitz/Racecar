@@ -2,6 +2,26 @@
 
 ## Status
 
+> **⚠️ Partially superseded by
+> [`gateway-runner-reuse.md`](gateway-runner-reuse.md).** The
+> `/api/virtual-targets/v1/*` wire contract this document specifies —
+> capability advertisement, the versioned queue-input schema, the
+> claim/progress/launch/failure output surfaces, health states, and the
+> gateway registration/heartbeat flow — **was never built server-side.** Only
+> DTOs and unused DB migrations landed in Overlord (commit `93dd8a1a`, contract
+> v3); no REST routes, service code, auth mechanism, or UI exist for it. The
+> gateway now self-provisions as an ordinary Overlord local runner
+> (`ensureActingDeviceTarget` + the built `POST /api/runner/claim` /
+> `.../requests/:id/launching` / `.../launched` / `.../failed` lifecycle) and
+> drives the mission via `ovld protocol *`. Treat every section below tagged
+> **[Superseded]** as historical; do not implement it.
+>
+> **Still correct and retained:** the domain-model sections — one car per
+> Overlord mission, one run per objective, the identity mapping between
+> snapshots/cars/missions, multi-resource project handling, and the layer /
+> security ownership boundaries. Those are unchanged; `gateway-runner-reuse.md`
+> builds on them.
+
 Proposed provider-neutral contract for an Overlord execution target that creates
 or reuses its actual execution environment after claiming a queued objective.
 Racecar is the first adapter, but the Overlord contract must not require Racecar,
@@ -37,6 +57,11 @@ attaches and delivers through the normal Overlord protocol.
 
 ## Capabilities
 
+> **[Superseded]** Capability advertisement over the `/api/virtual-targets/v1/*`
+> contract was never built. The gateway instead self-provisions as a plain
+> Overlord runner and advertises nothing over a bespoke surface. See
+> [`gateway-runner-reuse.md`](gateway-runner-reuse.md).
+
 An execution target advertises capabilities rather than a provider-specific type:
 
 ```ts
@@ -60,6 +85,13 @@ virtual target may provision another kind of environment behind the same queue
 contract.
 
 ## Layer responsibilities
+
+The ownership boundaries in this table remain correct and are retained. Only the
+wire mechanism changes: where the "Virtual-target gateway" row says *target
+registration and heartbeat* and *claim handling*, read that as the plain runner
+self-provisioning + `/api/runner/claim` lifecycle, **not** a
+`/api/virtual-targets/v1/*` registration/heartbeat surface (which was never
+built). See [`gateway-runner-reuse.md`](gateway-runner-reuse.md).
 
 | Layer | Owns | Must not own |
 | --- | --- | --- |
@@ -92,6 +124,13 @@ and the gateway must not mark an objective complete because it launched an agent
 Names, paths, repository basenames, and branch labels are not identities.
 
 ## Queue input
+
+> **[Superseded]** The `VirtualExecutionQueueItemV1` payload schema below was
+> never built into Overlord's queue. The gateway now receives only the plain
+> `/api/runner/claim` response plus `resolveWorkingDirectory`'s opaque
+> working-directory string, and derives everything else itself. Retained for
+> historical reference to the desired-state fields it once enumerated. See
+> [`gateway-runner-reuse.md`](gateway-runner-reuse.md).
 
 Overlord may add the following versioned payload to the existing execution-request
 queue item. The exact storage shape is an Overlord implementation detail; this is
@@ -292,6 +331,12 @@ surface and injects only narrowly scoped, short-lived credentials into the car.
 
 ## Validation before claim and launch
 
+> **[Superseded]** This validation split assumed the bespoke virtual-target
+> claim surface. With the plain runner lifecycle, Overlord performs no
+> virtual-target-specific pre-claim validation, and the gateway does its own
+> post-claim checks against whatever `resolveWorkingDirectory` resolved. See
+> [`gateway-runner-reuse.md`](gateway-runner-reuse.md).
+
 Overlord validates before queueing:
 
 - the target exists, is authorized for the project, and advertises the requested
@@ -317,6 +362,14 @@ A validation failure produces a typed failure output. It must not be represented
 as an agent failure because no run has started.
 
 ## Outputs
+
+> **[Superseded]** The `VirtualTargetClaimedV1` / `VirtualTargetProgressV1` /
+> `VirtualTargetLaunchObservationV1` / `VirtualTargetFailureV1` output DTOs
+> below were never built. The gateway now reports lifecycle transitions through
+> the plain runner surface (`.../requests/:id/launching`, `.../launched`,
+> `.../failed`) and drives mission-visible progress through `ovld protocol
+> update`/`heartbeat`/`deliver`. See
+> [`gateway-runner-reuse.md`](gateway-runner-reuse.md).
 
 The gateway reports small versioned observations through the existing runner/REST
 surface. Outputs are idempotent by `executionRequestId` and monotonically describe
@@ -473,6 +526,15 @@ states. Commands delegate back to the virtual target.
 
 ## State and timing rules
 
+> **[Superseded — wire mechanism only]** The claim-lease and launch-state
+> transitions below now ride Overlord's plain `/api/runner/*` lifecycle, not
+> the virtual-target claim/output surface. The underlying ordering (claim →
+> launching → launched → agent attach → delivery) still holds and the
+> idempotency invariant is retained — but it is now the gateway's own
+> responsibility to enforce (see the idempotency section of
+> [`gateway-runner-reuse.md`](gateway-runner-reuse.md)), since the plain runner
+> lifecycle does not enforce it for you.
+
 1. `queued`: Overlord has persisted the complete queue item for one target.
 2. `claimed`: the gateway holds the normal lease and returns claim acknowledgement.
 3. `launching`: validation and realization progress is underway.
@@ -515,6 +577,13 @@ or agent.
 
 ## Contract changes required in Overlord
 
+> **[Superseded]** None of the Overlord-side contract work enumerated below is
+> being pursued. `gateway-runner-reuse.md` deliberately requires **zero
+> Overlord-side changes** — it reuses the already-built device self-provisioning
+> and `/api/runner/*` claim lifecycle. Treat this list as abandoned scope, not a
+> backlog. See [`gateway-runner-reuse.md`](gateway-runner-reuse.md), "Explicit
+> non-goals for this plan."
+
 Before implementation, Overlord should specify:
 
 1. virtual-target capability advertisement and health semantics;
@@ -532,6 +601,13 @@ and ship an Overlord `rest-consumer` conformance manifest. It must not access th
 Overlord database directly.
 
 ## Initial acceptance scenario
+
+> **[Superseded — wire steps only]** The domain outcome this scenario proves
+> (one target, one car per mission, one run per objective, idempotent retry,
+> multi-resource materialization) is retained, but the steps that name the
+> "versioned queue item" and virtual-target REST surface are replaced by the
+> plain runner claim + `ovld protocol` flow in
+> [`gateway-runner-reuse.md`](gateway-runner-reuse.md).
 
 1. A user selects an online Racecar virtual target and queues an objective for a
    project with two repository resources.

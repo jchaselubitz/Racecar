@@ -25,6 +25,8 @@ export interface Snapshot {
   readonly lockfileHash?: string;
   /** Provider image name backing the snapshot, once known. */
   readonly imageName?: string;
+  /** Immutable resource-key to workspace-path layout baked into this image. */
+  readonly resourcePaths?: Readonly<Record<string, string>>;
   /** Normalized lifecycle state. */
   readonly state: SnapshotState;
   /** ISO-8601 creation timestamp. */

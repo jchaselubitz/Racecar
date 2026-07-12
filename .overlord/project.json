@@ -1,12 +1,12 @@
 {
   "_warning": "This file is managed by Overlord and is regenerated automatically when this folder is linked as a project resource. Do not edit it manually — manual changes will be overwritten.",
   "version": 2,
-  "projectId": "58b5ae5f-610d-4519-9ae1-623b1fa8aa1f",
-  "resourceId": "23341178-8844-47b5-b891-93ae857f09dc",
-  "resourceKey": "primary",
+  "projectId": "49763405-008f-4267-89e4-c57f5a234c91",
+  "resourceId": "d8c3a68a-6260-4290-ba4a-514596c06720",
+  "resourceKey": "racecar",
   "resourceIdsByExecutionTarget": {
-    "cf857924-0eb4-447d-b999-307c1411f094": "23341178-8844-47b5-b891-93ae857f09dc"
+    "7c50fde9-1935-413e-b08d-efc201e23068": "d8c3a68a-6260-4290-ba4a-514596c06720"
   },
   "isPrimary": true,
-  "linkedAt": "2026-07-10T08:25:33.555Z"
+  "linkedAt": "2026-07-12T16:36:22.798Z"
 }

@@ -155,6 +155,18 @@ export type SessionUpdate =
       readonly toolCallId: string;
       readonly title: string;
       readonly status: 'pending' | 'in_progress' | 'completed' | 'failed';
+    }
+  /**
+   * Racecar extension, not part of base ACP: the agent cannot safely continue
+   * without human clarification. The emitting adapter must end the current
+   * prompt after sending this update. Clients that understand the extension can
+   * route it to a durable question surface; the gateway maps it to
+   * `ovld protocol ask` and stops mission work. Plain agent prose is never
+   * inferred to be a question.
+   */
+  | {
+      readonly sessionUpdate: 'agent_question';
+      readonly question: string;
     };
 
 /** `session/update` notification params (agent → client). */

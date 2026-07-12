@@ -8,6 +8,16 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./shim-connect": {
+      "types": "./dist/shim-connect.d.ts",
+      "default": "./dist/shim-connect.js"
+    }
+  },
   "files": [
     "dist"
   ],
