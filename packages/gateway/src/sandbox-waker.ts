@@ -1,18 +1,13 @@
 import { claimBranch, type RunnerClaim, type ShimLaunchAdapter } from './launch-adapter.js';
+import type { RunnerQueueStatus } from './overlord-runner-contract.js';
 
-/**
- * Response shape of `GET /api/runner/status`, confirmed against the live
- * backend: a `queue` of the target's not-yet-claimed execution requests plus a
- * count of those already active. Each queue item carries the same fields as a
- * claim, so the wake path reads it as a {@link RunnerClaim}. The endpoint also
- * accepts an optional `?projectId=` filter, but the unfiltered read already
- * returns every queued request this target serves, so the gateway does not need
- * to enumerate (and does not store) Overlord project ids to use it.
- */
-export interface RunnerQueueStatus {
-  readonly queue: readonly RunnerClaim[];
-  readonly activeCount: number;
-}
+// `RunnerQueueStatus` is vendored in ./overlord-runner-contract.ts (the
+// manifest's declared vendored contract); re-export it so existing importers
+// keep their `./sandbox-waker.js` path. The endpoint also accepts an optional
+// `?projectId=` filter, but the unfiltered read already returns every queued
+// request this target serves, so the gateway does not need to enumerate (and
+// does not store) Overlord project ids to use it.
+export type { RunnerQueueStatus } from './overlord-runner-contract.js';
 
 export interface SandboxWakerOptions {
   readonly adapter: ShimLaunchAdapter;
@@ -73,5 +68,13 @@ export class SandboxWaker {
 
 /** Collapse queued requests to the single sandbox each would wake. */
 function wakeKey(item: RunnerClaim): string {
-  return `${item.missionId}\u0000${claimBranch(item) ?? ''}`;
+  const mode =
+    typeof item.metadata?.sandboxLaunch === 'string'
+      ? item.metadata.sandboxLaunch
+      : typeof item.metadata?.sandboxLaunchMode === 'string'
+        ? item.metadata.sandboxLaunchMode
+        : typeof item.metadata?.launchMode === 'string'
+          ? item.metadata.launchMode
+          : '';
+  return `${item.missionId}\u0000${claimBranch(item) ?? ''}\u0000${mode}`;
 }

@@ -30,7 +30,8 @@ once" cheap:
 Racecar deliberately mirrors the Overlord UX model — repositories, missions
 (features), and objectives (prompts within a mission) — but it must be fully
 usable from a plain terminal with no Overlord server or credentials. Overlord
-integrates later as one caller among many.
+integrates as one caller among many, through the `@racecar/gateway` worker
+(see [Overlord gateway](#overlord-gateway)).
 
 ## Core concepts
 
@@ -183,6 +184,24 @@ immutable-queue semantics, and the minimal contract Racecar exposes to Overlord
 are specified in
 [Git integration for mission sandboxes](planning/git-integration.md).
 
+### Overlord gateway
+
+`@racecar/gateway` is the long-lived worker that connects a single Overlord
+execution target to Racecar. It claims one plain `/api/runner/*` request at a
+time, launches it in a Racecar sandbox through the ACP shim, drives the mission
+lifecycle with `ovld protocol` on the agent's behalf, and — right after a
+successful `deliver` — advances that project's local Git integration queue. It
+never reads the Overlord database and never completes an objective itself; the
+target is keyed by a stable device fingerprint rather than a bespoke
+register/heartbeat contract.
+
+On each claim the gateway resolves a **launch mode**, so a mission need not
+always get its own sandbox: `mission-branch` (one sandbox per mission),
+`branch` (one shared sandbox per project + branch), or `default-branch` (one
+shared sandbox per project). See [docs/gateway.md](docs/gateway.md) for required
+inputs, deployment (Railway / Raspberry Pi), and the full launch-mode resolution
+order.
+
 ## Design principles
 
 - **Overlord-shaped, not generic.** The domain model (project / mission
@@ -198,18 +217,22 @@ are specified in
 
 ## Stack
 
-TypeScript, Node 22, Yarn (workspaces). Planned packages:
+TypeScript, Node 22, Yarn (workspaces). Packages:
 
 - `packages/core` — domain model, provider adapter interface, Daytona adapter,
-  credential store.
-- `packages/cli` — the `racecar` binary.
+  credential store, quota, reconcile, integration queue, security/firewall.
+- `packages/cli` — the `racecar` binary (project, snapshot, sandbox, run, chat,
+  attach, msg/inbox, integration, auth, reconcile, audit, quota).
 - `packages/shim` — the in-sandbox daemon (ACP server, agent adapters,
-  mailbox), shipped into snapshots.
+  mailbox, run/git servers), shipped into snapshots.
+- `packages/gateway` — the long-lived Overlord execution worker (see
+  [Overlord gateway](#overlord-gateway)).
 
 ## Status
 
-Pre-implementation. See [planning/implementation-plan.md](planning/implementation-plan.md)
-for the staged build sequence, and the earlier explorations in
-[planning/daytona-sandbox-execution-target.md](planning/daytona-sandbox-execution-target.md)
-and [planning/overlord-useage.md](planning/overlord-useage.md) that this
-design supersedes.
+Implemented and under active development. All four packages exist with test
+coverage across `vitest`; the `racecar` CLI surface described above is built.
+The staged build sequence lives in
+[planning/implementation-plan.md](planning/implementation-plan.md); the earlier
+exploration in [planning/overlord-useage.md](planning/overlord-useage.md)
+records the design this supersedes.

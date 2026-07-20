@@ -51,7 +51,15 @@ export const SandboxLabelKeys = {
 } as const;
 
 /** Well-known sandbox roles; `role` is left open for future kinds. */
-export type SandboxRole = 'mission' | 'snapshot-build';
+export type SandboxRole = 'mission' | 'snapshot-build' | 'project';
+
+/**
+ * Mission label stamped on project-scoped (shared) sandboxes — one sandbox per
+ * project/branch rather than one per Overlord mission. Find/create paths that
+ * share a sandbox across missions match on this sentinel instead of the claim's
+ * mission id.
+ */
+export const SHARED_PROJECT_MISSION = 'project';
 
 /**
  * The identity carried by a Racecar-managed sandbox. This is the decoded,

@@ -3,6 +3,7 @@ export {
   LABEL_SCHEMA_VERSION,
   LABEL_LIMITS,
   SandboxLabelKeys,
+  SHARED_PROJECT_MISSION,
   LabelValidationError,
   validateLabels,
   encodeSandboxLabels,

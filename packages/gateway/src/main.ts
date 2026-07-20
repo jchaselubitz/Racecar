@@ -4,7 +4,8 @@ import { promisify } from 'node:util';
 import type { PromptResponse, SessionSummary } from '@racecar/shim';
 import { loadConfig } from './config.js';
 import { GatewayStateStore } from './gateway-state.js';
-import { gatewayProvider, ShimLaunchAdapter, type RunnerClaim } from './launch-adapter.js';
+import { gatewayProvider, ShimLaunchAdapter } from './launch-adapter.js';
+import type { RunnerClaimResponse, RunnerFailureBody } from './overlord-runner-contract.js';
 import { OverlordProtocolBridge } from './protocol-bridge.js';
 import { SandboxWaker, type RunnerQueueStatus } from './sandbox-waker.js';
 
@@ -12,7 +13,17 @@ const execFileAsync = promisify(execFile);
 
 const config = loadConfig();
 const provider = gatewayProvider();
-const launchAdapter = new ShimLaunchAdapter({ provider, stateDirectory: config.stateDirectory });
+const launchAdapter = new ShimLaunchAdapter({
+  provider,
+  stateDirectory: config.stateDirectory,
+  overlord: {
+    backendUrl: config.backendUrl,
+    token: config.token,
+    deviceFingerprint: config.deviceFingerprint,
+  },
+  ...(config.branchStrategy !== undefined ? { branchStrategy: config.branchStrategy } : {}),
+  ...(config.sharedBranch !== undefined ? { sharedBranch: config.sharedBranch } : {}),
+});
 const gatewayState = new GatewayStateStore(config.stateDirectory);
 let stopping = false;
 let healthy = false;
@@ -23,7 +34,7 @@ let healthy = false;
  * Racecar sandbox through the shim adapter instead.
  */
 async function runOnce(): Promise<void> {
-  const claim = await runnerPost<{ request?: RunnerClaim }>('/api/runner/claim', {});
+  const claim = await runnerPost<RunnerClaimResponse>('/api/runner/claim', {});
   if (claim.request === undefined) return;
   const request = claim.request;
   await runnerPost(`/api/runner/requests/${encodeURIComponent(request.id)}/launching`);
@@ -79,9 +90,21 @@ async function runOnce(): Promise<void> {
         await bridge.resume(resumed, reservation.record.protocolSessionKey);
       }
       if (resumed.summary.status === 'running') {
-        void completeResumedTurn(request.id, bridge, integration, resumed.connection, resumed.sessionId);
+        void completeResumedTurn(
+          request.id,
+          bridge,
+          integration,
+          resumed.connection,
+          resumed.sessionId,
+        );
       } else if (resumed.summary.lastStopReason !== undefined) {
-        void completeResumedTurn(request.id, bridge, integration, resumed.connection, resumed.sessionId);
+        void completeResumedTurn(
+          request.id,
+          bridge,
+          integration,
+          resumed.connection,
+          resumed.sessionId,
+        );
       } else {
         await gatewayState.markPrompted(request.id);
         const launch = launchAdapter.prompt(resumed);
@@ -127,7 +150,7 @@ async function runOnce(): Promise<void> {
       await gatewayState.markFailed(request.id, message).catch(() => {});
     await runnerPost(`/api/runner/requests/${encodeURIComponent(request.id)}/failed`, {
       error: message,
-    });
+    } satisfies RunnerFailureBody);
     throw error;
   }
 }

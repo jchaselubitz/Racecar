@@ -22,6 +22,8 @@ contract.
 | `RACECAR_GATEWAY_STATE_DIR` | yes | A persistent, writable host/volume directory containing the `.racecar` project state and gateway request map. It must survive restarts and redeploys. |
 | `RACECAR_GATEWAY_INSTANCE_ID` | recommended | Stable UUID for this deployment. Persist it across restarts. |
 | `RACECAR_GATEWAY_POLL_MS` | no | Claim/wake poll interval; defaults to `5000`. |
+| `RACECAR_GATEWAY_BRANCH_STRATEGY` | no | Gateway-wide branching policy: `per-mission` (a dedicated branch/sandbox per mission) or `shared` (all missions in a project share one branch/sandbox, avoiding per-mission merges). Overrides Overlord's per-mission `mission.branch` decision; a per-claim launch mode still wins. Unset keeps the historical per-claim/Overlord defaults. |
+| `RACECAR_GATEWAY_SHARED_BRANCH` | no | Branch used by the `shared` strategy; defaults to the project/Overlord base branch. Ignored unless `RACECAR_GATEWAY_BRANCH_STRATEGY=shared`. |
 | `PORT` | no | Health server port; defaults to `8080`. |
 
 Each project's merge-to-main integration queue is driven automatically from its
@@ -58,10 +60,46 @@ gateway token in `.env` with owner-only permissions; never commit it.
 ## Lifecycle
 
 For each claimed request the gateway resolves the project/resource from the
-Overlord-registered working directory, resumes or creates the matching sandbox,
-opens an ACP session through the shim, and translates the session-update stream
-into `ovld protocol attach`/`update`/`heartbeat`/`ask`/`deliver`. A separate
-always-on wake loop resumes stopped sandboxes for projects with queued work so a
-claim never blocks on a slow restore. See
-[`planning/gateway-runner-reuse.md`](../planning/gateway-runner-reuse.md) for the
-full architecture.
+Overlord-registered working directory, chooses a sandbox launch mode, resumes
+or creates the matching sandbox, opens an ACP session through the shim, and
+translates the session-update stream into `ovld protocol
+attach`/`update`/`heartbeat`/`ask`/`deliver`. A separate always-on wake loop
+resumes stopped sandboxes for projects with queued work so a claim never blocks
+on a slow restore. See [`planning/gateway-runner-reuse.md`](../planning/gateway-runner-reuse.md)
+for the full architecture.
+
+### Sandbox launch modes
+
+Racecar no longer always provisions one sandbox per mission. On each claim the
+gateway resolves a launch mode and places the run accordingly:
+
+| Mode | Sandbox scope | Branch |
+| --- | --- | --- |
+| `mission-branch` | One sandbox per mission | Mission branch (created from the base branch when missing) |
+| `branch` | One shared sandbox per project + branch | Caller-specified branch |
+| `default-branch` | One shared sandbox per project | Project / Overlord base branch |
+
+Resolution order:
+
+1. Explicit claim metadata: `metadata.sandboxLaunch`, `sandboxLaunchMode`, or
+   `launchMode` set to one of the three modes above. A branch name may be
+   supplied as top-level `claim.branch` or `metadata.branch`.
+2. Gateway branching strategy (`RACECAR_GATEWAY_BRANCH_STRATEGY`), applied to
+   every claim this gateway serves:
+   - `per-mission` → `mission-branch` (one dedicated branch/sandbox per mission)
+   - `shared` → `default-branch`, or `branch` when
+     `RACECAR_GATEWAY_SHARED_BRANCH` names a branch — all missions in the
+     project share one branch/sandbox, so there is no per-mission merge step.
+
+   This gateway-wide policy overrides Overlord's per-mission `mission.branch`
+   decision but still yields to an explicit launch mode named on the claim.
+3. Overlord's `mission.branch` object (fetched by the gateway):
+   - `overrideBranch` → `branch`
+   - `willPrepareBranch: true` (or `worktreePreference` of `branch`/`worktree`) → `mission-branch`
+   - `willPrepareBranch: false` → `default-branch`
+4. Otherwise: historical default — mission-scoped sandbox on the claim branch
+   or the project default branch.
+
+Shared project sandboxes are labeled with mission `project` and role `project`
+so later claims on the same branch reuse them instead of creating another car.
+

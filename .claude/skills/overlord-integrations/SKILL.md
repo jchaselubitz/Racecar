@@ -30,6 +30,69 @@ contract. The concrete contract facts you need most often are embedded below so 
 rarely have to leave this file — but always confirm against the live repo, since the
 contract is versioned and evolves.
 
+### Launch-time project resources and environment variables
+
+An integration launched by Overlord receives resource context **twice**:
+
+1. At process launch, in environment variables built by the launch plan.
+2. After `ovld protocol attach`, in the returned `projectResources` array, refreshed for
+   the execution target.
+
+Treat the launch environment as the early, machine-local handoff; use `attach` as the
+authoritative protocol refresh. Do not read Overlord tables or a resource's private
+configuration to fill in missing launch data.
+
+| Launch value | Contracted meaning | How an integration should use it |
+|---|---|---|
+| `OVERLORD_PROJECT_RESOURCES` | JSON array of every logical project resource resolved for this execution target. Each entry has `resourceKey`, `label`, `isPrimary`, `isCurrent`, `accessMode` (`read_write` or `read`), `path` (string or `null`), and `state`. It is set only when the project has resources. | Parse it as JSON; use resource keys to label/reconcile repositories and use only non-null local paths that the runner has made available. |
+| `OVERLORD_PROJECT_RESOURCES_PATHS` | Comma-separated connected absolute paths, each suffixed `:rw` or `:ro`. A missing suffix is accepted by parsers as `rw` for backwards compatibility, but launchers now emit explicit suffixes. | Useful for path allowlists. Preserve the suffix semantics: `:ro` is reference-only and must not be modified. |
+| `OVERLORD_PROJECT_RESOURCES_PATHS_CSV` | Backward-compatible alias of `OVERLORD_PROJECT_RESOURCES_PATHS`. | Prefer the non-`_CSV` name in new integrations; accept the alias when compatibility requires it. |
+| `OVERLORD_PRIMARY_RESOURCE_PATH` | Local path of the primary (or current) resource, or empty when it is not connected locally. | Use as the default working repository only; it is not a list of all project repositories. |
+
+The agent's terminal has one working directory, while the manifest is plural. A sibling
+with `path: null` is a real project resource that is unavailable on this machine, not a
+path to invent. The primary resource is always `read_write`; non-primary `read` resources
+are reference repositories. URL/Git sources have no local path, so they are omitted from
+the `*_PATHS` values.
+
+Project Settings may additionally define `launchEnvVars` and `preLaunchCommands`. The
+runner resolves `{OVERLORD_VARIABLE}` placeholders while building the launch plan, exports
+the resulting environment, then runs the pre-launch commands before starting the agent.
+`{VAR}` refers only to Overlord's built-in launch context; after export, user-defined vars
+are ordinary shell variables referenced as `$NAME`. `projectResources` and the session key
+exist only after attach and cannot be used in `{VAR}` substitution.
+
+#### Racecar / GitHub checkout rule
+
+Racecar should parse `OVERLORD_PROJECT_RESOURCES` before work begins, then reconcile the
+same resource keys against the `projectResources` array returned by attach. For each entry:
+
+1. Use an available local `path` directly and honor `accessMode` (`read` means inspect,
+   never edit).
+2. If `path` is `null`, record that the resource is unavailable locally; do not infer a
+   GitHub owner/repository from the resource key or attempt a clone from a guessed URL.
+3. Keep file changes and delivery rationales scoped to the current, writable working
+   resource unless an objective explicitly launches Racecar into another resource.
+
+**Important current limitation:** the public launch/attach resource manifest exposes
+resource identity, local path, state, and access mode — **not** a Git source URL. Although
+Overlord project resources may have a secret-free `git` source registered (for example via
+`ovld add-url --url <git-url>`), the current manifest deliberately omits that descriptor.
+Therefore project resources alone cannot yet tell Racecar which unavailable GitHub
+repositories to pull. A project may temporarily supply an explicit, non-secret
+`RACECAR_GITHUB_REPOSITORIES` (or equivalent) through `launchEnvVars`, but it must be kept
+in sync manually and must never contain credentials.
+
+To make automatic checkout discovery a supported integration feature, change the
+Overlord contract first: add an explicitly secret-free Git source projection (for example
+`sourceKind` plus `sourceUrl`) to the launch and attach resource-manifest schemas; define
+which source kinds and URL schemes are permitted; document availability/state behavior;
+then bump the contract version and update `CONTRACT.md`, the machine-readable contract,
+launch-variable catalog, DTOs, tests, and examples. Only after that contract change should
+Racecar clone a declared URL, using its own GitHub credential flow and a destination outside
+the primary working tree. Never expose tokens, SSH private keys, or credential-bearing URLs
+through the manifest or `launchEnvVars`.
+
 ---
 
 ## 1. Repo map (what lives where)

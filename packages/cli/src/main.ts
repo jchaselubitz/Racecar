@@ -127,7 +127,9 @@ async function readJson<T>(path: string, description: string): Promise<T> {
 async function loadProject(name: string): Promise<Project> {
   // Normalize legacy project files so snapshots gain the primary resource even
   // when they were created before multi-resource layouts existed.
-  return defineProject(await readJson<Project>(statePath(PROJECTS_DIR, `${name}.json`), `project '${name}'`));
+  return defineProject(
+    await readJson<Project>(statePath(PROJECTS_DIR, `${name}.json`), `project '${name}'`),
+  );
 }
 
 async function loadSnapshot(project: string): Promise<Snapshot> {
@@ -281,8 +283,13 @@ async function projectInit(args: readonly string[]): Promise<void> {
       ? undefined
       : (() => {
           const value: unknown = JSON.parse(resourcesJson);
-          if (!Array.isArray(value) || value.some((entry) => entry === null || typeof entry !== 'object')) {
-            throw new Error('--resources-json must be an array of { key, repoUrl, branch } objects');
+          if (
+            !Array.isArray(value) ||
+            value.some((entry) => entry === null || typeof entry !== 'object')
+          ) {
+            throw new Error(
+              '--resources-json must be an array of { key, repoUrl, branch } objects',
+            );
           }
           return value as { key: string; repoUrl: string; branch: string }[];
         })();
@@ -336,7 +343,9 @@ async function snapshotBuild(args: readonly string[]): Promise<void> {
     baseImage: option(parsed, 'base-image') ?? DEFAULT_IMAGE,
     ...(currentHash !== undefined ? { lockfileHash: currentHash } : {}),
     ...(built.imageName !== undefined ? { imageName: built.imageName } : {}),
-    resourcePaths: Object.fromEntries(project.resources.map((resource) => [resource.key, resource.workspaceDir])),
+    resourcePaths: Object.fromEntries(
+      project.resources.map((resource) => [resource.key, resource.workspaceDir]),
+    ),
     state: built.state,
     createdAt: new Date().toISOString(),
   };
@@ -370,6 +379,8 @@ async function sandboxCreate(args: readonly string[]): Promise<void> {
   const project = await loadProject(requireOption(parsed, 'project'));
   const mission = requireOption(parsed, 'mission');
   const branch = option(parsed, 'branch') ?? project.defaultBranch;
+  const baseBranch = option(parsed, 'base-branch') ?? project.defaultBranch;
+  const shared = parsed.options.has('shared');
   const extraLabels = additionalSandboxLabels(option(parsed, 'labels-json'));
   const workspaceContextFile = option(parsed, 'workspace-context-file');
   const workspaceContext =
@@ -416,7 +427,7 @@ async function sandboxCreate(args: readonly string[]): Promise<void> {
     snapshot: snapshot.name,
     resourceClass: resourceClass.name,
     createdAt: now,
-    role: 'mission',
+    role: shared ? 'project' : 'mission',
     ...(process.env.USER !== undefined ? { createdBy: process.env.USER } : {}),
   });
   for (const key of Object.keys(extraLabels)) {
@@ -449,6 +460,8 @@ async function sandboxCreate(args: readonly string[]): Promise<void> {
   // Credential setup commands (which materialize 0600 files from injected env
   // vars) run before the clone so a private repo authenticates. They reference
   // env var names only — no secret literal ever enters this command string.
+  // Prefer an existing remote branch; otherwise create it from --base-branch so
+  // mission-branch launches can mint a new branch inside the sandbox.
   const checkout = [
     'set -eu',
     ...injection.setupCommands,
@@ -456,8 +469,12 @@ async function sandboxCreate(args: readonly string[]): Promise<void> {
     // only its primary working tree to the requested mission branch; recloning
     // here would discard siblings and make the registered Overlord paths vary
     // by sandbox instance.
-    `git -C ${dir} fetch origin ${shellQuote(branch)}`,
-    `git -C ${dir} checkout --force -B ${shellQuote(branch)} FETCH_HEAD`,
+    `if git -C ${dir} fetch origin ${shellQuote(branch)} && git -C ${dir} rev-parse --verify --quiet FETCH_HEAD >/dev/null; then`,
+    `  git -C ${dir} checkout --force -B ${shellQuote(branch)} FETCH_HEAD`,
+    'else',
+    `  git -C ${dir} fetch origin ${shellQuote(baseBranch)}`,
+    `  git -C ${dir} checkout --force -B ${shellQuote(branch)} FETCH_HEAD`,
+    'fi',
     `cd ${dir}`,
     'corepack enable',
     'yarn install --immutable',
@@ -1326,7 +1343,7 @@ async function snapshotCheck(args: readonly string[]): Promise<void> {
 }
 
 function usage(): string {
-  return `${banner()}\n\nUsage:\n  racecar project init [--name <name>] [--repo <url>] [--branch <branch>] [--auto-rebuild-snapshot] [--egress-allowlist <domain,...>]\n  racecar snapshot build --project <project> [--base-image <image>]\n  racecar snapshot check --project <project> [--lockfile-hash <hash>] [--rebuild]\n  racecar sandbox create --project <project> --mission <name> [--branch <branch>] [--resource-class <${Object.keys(RESOURCE_CLASSES).join('|')}>] [--labels-json <object>] [--workspace-context-file <path>]\n  racecar sandbox stop|start|rm <sandbox-id>\n  racecar ps [--project <project>] [--watch --interval <seconds>]\n  racecar quota [--project <project>]\n  racecar attach <sandbox-id>\n  racecar run <sandbox-id> "<prompt>" [--agent <${knownAgents().join('|')}>] [--timeout <seconds>]\n  racecar runs <sandbox-id>\n  racecar chat <sandbox-id> ["<prompt>"] [--run <run-id>]\n  racecar msg send <sandbox-id> "<text>" [--session <run-id>]\n  racecar msg reply <sandbox-id> <message-id> "<text>"\n  racecar inbox [--project <project>] [--sandbox <sandbox-id>] [--unread]\n  racecar reconcile [--project <project>] [--dry-run] [--max-run-minutes <n>]\n  racecar audit [--project <project>]\n  racecar integration status [--resource <key>] [--mission <id>] [--entry <id>]\n  racecar integration enqueue --mission <id> --head <sha> [--branch <name>] [--resource <key>] [--priority <low|normal|high>]\n  racecar integration approve|dequeue --entry <id> [--resource <key>]\n  racecar integration retry --entry <id> --head <sha> [--resource <key>]\n  racecar integration run --once [--resource <key>]\n  racecar shim rotate-token <sandbox-id>\n  racecar auth claude [--token <t>] [--stdin]\n  racecar auth git [--host <h>] [--username <u>] [--token <t>] [--stdin]\n  racecar auth list | rm <name>\n  racecar auth revoke <name> [--stop-sandboxes]\n\nAdd --json to any command for an NDJSON event stream on stdout.\n\nResource classes (estimated spend in 'racecar ps'): ${Object.values(
+  return `${banner()}\n\nUsage:\n  racecar project init [--name <name>] [--repo <url>] [--branch <branch>] [--auto-rebuild-snapshot] [--egress-allowlist <domain,...>]\n  racecar snapshot build --project <project> [--base-image <image>]\n  racecar snapshot check --project <project> [--lockfile-hash <hash>] [--rebuild]\n  racecar sandbox create --project <project> --mission <name> [--branch <branch>] [--base-branch <branch>] [--shared] [--resource-class <${Object.keys(RESOURCE_CLASSES).join('|')}>] [--labels-json <object>] [--workspace-context-file <path>]\n  racecar sandbox stop|start|rm <sandbox-id>\n  racecar ps [--project <project>] [--watch --interval <seconds>]\n  racecar quota [--project <project>]\n  racecar attach <sandbox-id>\n  racecar run <sandbox-id> "<prompt>" [--agent <${knownAgents().join('|')}>] [--timeout <seconds>]\n  racecar runs <sandbox-id>\n  racecar chat <sandbox-id> ["<prompt>"] [--run <run-id>]\n  racecar msg send <sandbox-id> "<text>" [--session <run-id>]\n  racecar msg reply <sandbox-id> <message-id> "<text>"\n  racecar inbox [--project <project>] [--sandbox <sandbox-id>] [--unread]\n  racecar reconcile [--project <project>] [--dry-run] [--max-run-minutes <n>]\n  racecar audit [--project <project>]\n  racecar integration status [--resource <key>] [--mission <id>] [--entry <id>]\n  racecar integration enqueue --mission <id> --head <sha> [--branch <name>] [--resource <key>] [--priority <low|normal|high>]\n  racecar integration approve|dequeue --entry <id> [--resource <key>]\n  racecar integration retry --entry <id> --head <sha> [--resource <key>]\n  racecar integration run --once [--resource <key>]\n  racecar shim rotate-token <sandbox-id>\n  racecar auth claude [--token <t>] [--stdin]\n  racecar auth git [--host <h>] [--username <u>] [--token <t>] [--stdin]\n  racecar auth list | rm <name>\n  racecar auth revoke <name> [--stop-sandboxes]\n\nAdd --json to any command for an NDJSON event stream on stdout.\n\nResource classes (estimated spend in 'racecar ps'): ${Object.values(
     RESOURCE_CLASSES,
   )
     .map((c) => `${c.name} (${formatUsd(c.hourlyUsd)}/hr)`)
