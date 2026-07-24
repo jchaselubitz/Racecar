@@ -1229,18 +1229,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@racecar/cli@workspace:^, @racecar/cli@workspace:packages/cli":
-  version: 0.0.0-use.local
-  resolution: "@racecar/cli@workspace:packages/cli"
-  dependencies:
-    "@racecar/core": "workspace:^"
-    "@racecar/shim": "workspace:^"
-    yaml: "npm:^2.0.0"
-  bin:
-    racecar: ./dist/main.js
-  languageName: unknown
-  linkType: soft
-
 "@racecar/core@workspace:^, @racecar/core@workspace:packages/core":
   version: 0.0.0-use.local
   resolution: "@racecar/core@workspace:packages/core"
@@ -1254,9 +1242,9 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@racecar/gateway@workspace:packages/gateway"
   dependencies:
-    "@racecar/cli": "workspace:^"
     "@racecar/core": "workspace:^"
     "@racecar/shim": "workspace:^"
+    racecar-cli: "workspace:^"
   bin:
     racecar-gateway: ./dist/main.js
   languageName: unknown
@@ -3326,6 +3314,22 @@ __metadata:
   checksum: 10/72900df0616e473e824202113c3df6abae59150dfb73ed13273503127235320e9c8ca4aaaaccfd58cf417c6ca92a6e68ee9a5c3182886ae949a768639b388a7b
   languageName: node
   linkType: hard
+
+"racecar-cli@workspace:^, racecar-cli@workspace:packages/cli":
+  version: 0.0.0-use.local
+  resolution: "racecar-cli@workspace:packages/cli"
+  dependencies:
+    "@daytona/sdk": "npm:^0.196.0"
+    "@racecar/core": "workspace:^"
+    "@racecar/shim": "workspace:^"
+    "@types/ws": "npm:^8.5.13"
+    esbuild: "npm:^0.21.5"
+    ws: "npm:^8.18.0"
+    yaml: "npm:^2.0.0"
+  bin:
+    racecar: ./dist/racecar.js
+  languageName: unknown
+  linkType: soft
 
 "racecar@workspace:.":
   version: 0.0.0-use.local

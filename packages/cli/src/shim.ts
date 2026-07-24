@@ -11,6 +11,7 @@
 import { createRequire } from 'node:module';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   shimBootScript,
   shimRebootScript,
@@ -20,18 +21,36 @@ import {
   type SandboxProvider,
 } from '@racecar/core';
 
-/** Resolve and read the bundled shim daemon source from the installed package. */
+/**
+ * Resolve and read the bundled shim daemon source (`racecar-shim.cjs`).
+ *
+ * Two layouts are supported. In the published `racecar-cli` package the daemon
+ * ships as an asset alongside this module's bundle, so it is read from next to
+ * `import.meta.url`. In the monorepo (dev builds and tests) `@racecar/shim` is a
+ * resolvable workspace package, so its `dist/racecar-shim.cjs` is used. We try
+ * the co-located asset first and fall back to the workspace package.
+ */
 export async function readShimBundle(): Promise<string> {
   const require = createRequire(import.meta.url);
-  const packageJson = require.resolve('@racecar/shim/package.json');
-  const bundlePath = join(dirname(packageJson), 'dist', 'racecar-shim.cjs');
+  const candidates = [fileURLToPath(new URL('./racecar-shim.cjs', import.meta.url))];
   try {
-    return await readFile(bundlePath, 'utf8');
+    const packageJson = require.resolve('@racecar/shim/package.json');
+    candidates.push(join(dirname(packageJson), 'dist', 'racecar-shim.cjs'));
   } catch {
-    throw new Error(
-      `shim bundle not found at ${bundlePath}; build it with 'yarn workspace @racecar/shim build'`,
-    );
+    // `@racecar/shim` is not resolvable in the published single package; the
+    // co-located asset is the source of truth there.
   }
+  for (const path of candidates) {
+    try {
+      return await readFile(path, 'utf8');
+    } catch {
+      // Try the next candidate layout.
+    }
+  }
+  throw new Error(
+    `shim bundle not found (looked in: ${candidates.join(', ')}); ` +
+      `build it with 'yarn workspace @racecar/shim build'`,
+  );
 }
 
 /** Whether the shim's tmux session is alive, parsed from {@link shimStatusScript}. */

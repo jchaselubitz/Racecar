@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { connectShim, type ShimConnection } from '@racecar/cli/shim-connect';
+import { connectShim, type ShimConnection } from 'racecar-cli/shim-connect';
 import {
   DaytonaProvider,
   RetryingProvider,

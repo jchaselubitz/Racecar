@@ -9,7 +9,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "tsc --build && yarn workspace @racecar/shim bundle",
+    "build": "tsc --build && yarn workspace @racecar/shim bundle && yarn workspace racecar-cli bundle",
     "clean": "tsc --build --clean && rimraf 'packages/*/dist'",
     "typecheck": "tsc --build",
     "lint": "eslint .",
