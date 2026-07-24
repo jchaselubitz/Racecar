@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Agent-agnostic, launcher-agnostic control-plane CLI for cloud coding sandboxes.",
   "license": "MIT",
-  "author": "Jake Lubitz",
+  "author": "Jake Chase-Lubitz",
   "homepage": "https://github.com/jchaselubitz/Racecar#readme",
   "repository": {
     "type": "git",
