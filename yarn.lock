@@ -3327,7 +3327,7 @@ __metadata:
     ws: "npm:^8.18.0"
     yaml: "npm:^2.0.0"
   bin:
-    racecar: ./dist/racecar.js
+    racecar: dist/racecar.js
   languageName: unknown
   linkType: soft
 
