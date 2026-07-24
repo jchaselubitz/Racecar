@@ -2,7 +2,6 @@
   "name": "@racecar/gateway",
   "version": "0.1.0",
   "type": "module",
-  "private": false,
   "bin": {
     "racecar-gateway": "./dist/main.js"
   },
