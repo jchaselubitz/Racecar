@@ -169,13 +169,13 @@ export async function fetchMissionBranch(options: {
     ...(typeof record.name === 'string' ? { name: record.name } : {}),
     ...(typeof record.baseBranch === 'string' ? { baseBranch: record.baseBranch } : {}),
     ...(typeof record.overrideBranch === 'string' || record.overrideBranch === null
-      ? { overrideBranch: record.overrideBranch as string | null }
+      ? { overrideBranch: record.overrideBranch }
       : {}),
     ...(typeof record.willPrepareBranch === 'boolean'
       ? { willPrepareBranch: record.willPrepareBranch }
       : {}),
     ...(typeof record.worktreePreference === 'string' || record.worktreePreference === null
-      ? { worktreePreference: record.worktreePreference as string | null }
+      ? { worktreePreference: record.worktreePreference }
       : {}),
   };
 }
