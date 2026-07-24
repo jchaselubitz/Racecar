@@ -11,6 +11,9 @@ Daytona is the sandbox provider underneath, accessed only through an adapter.
 Racecar has no server of its own: the CLI is a stateless client, each sandbox
 hosts its own small daemon, and clients talk to sandboxes directly.
 
+Racecar is built to be deeply integrated with [Overlord](https://www.ovld.ai), but it can be used independently.
+
+
 ## Why
 
 Local agent execution gives agents a familiar developer machine but no elastic,
