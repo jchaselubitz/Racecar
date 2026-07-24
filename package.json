@@ -16,6 +16,8 @@
     "fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "gateway:cli-versions": "node scripts/update-gateway-cli-versions.mjs",
+    "gateway:cli-versions:check": "node scripts/update-gateway-cli-versions.mjs --check",
     "test": "vitest run",
     "test:watch": "vitest",
     "prepare": "husky"

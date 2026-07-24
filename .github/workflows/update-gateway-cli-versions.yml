@@ -1,0 +1,33 @@
+name: Update gateway CLI versions
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Refresh pinned CLI releases
+        run: node scripts/update-gateway-cli-versions.mjs
+
+      - name: Create update pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: automation/gateway-cli-versions
+          delete-branch: true
+          commit-message: 'chore(gateway): update bundled CLI versions'
+          title: 'chore(gateway): update bundled CLI versions'
+          body: |
+            Updates the pinned `overlord-cli` and `racecar-cli` releases used by the gateway image.

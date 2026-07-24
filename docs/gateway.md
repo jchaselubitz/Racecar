@@ -41,6 +41,21 @@ shell-out is replaced by the in-process launch adapter (shim connect + protocol
 bridge). This doc's virtual-target registration/heartbeat framing is superseded
 by [`planning/gateway-runner-reuse.md`](../planning/gateway-runner-reuse.md).
 
+## Bundled command-line tools
+
+The gateway image installs pinned `overlord-cli` and `racecar-cli` releases, so
+the `ovld` and `racecar` subprocesses it uses do not depend on a base image or
+project sandbox. Their pins live in
+[`deploy/railway/Dockerfile`](../deploy/railway/Dockerfile). Override either at
+build time with `--build-arg OVERLORD_CLI_VERSION=<version>` or
+`--build-arg RACECAR_CLI_VERSION=<version>` when testing a compatible release.
+
+The weekly [gateway CLI update workflow](../.github/workflows/update-gateway-cli-versions.yml)
+queries npm for both `latest` releases and opens or refreshes a PR when a pin
+changes. Run `node scripts/update-gateway-cli-versions.mjs` locally to refresh
+the pins (or `yarn gateway:cli-versions`), or use
+`yarn gateway:cli-versions:check` to make automation fail when they are stale.
+
 ## Railway
 
 Deploy the prebuilt image `ghcr.io/jchaselubitz/racecar-gateway` (published by
@@ -106,4 +121,3 @@ Resolution order:
 
 Shared project sandboxes are labeled with mission `project` and role `project`
 so later claims on the same branch reuse them instead of creating another car.
-
