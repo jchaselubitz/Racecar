@@ -32,6 +32,18 @@ request → sandbox → ACP-session map. On an ephemeral filesystem, a restart c
 re-claim already-claimed Overlord work and spawn a **duplicate agent run**. The
 volume must survive restarts and redeploys.
 
+The gateway now preflights this at boot so a misconfiguration is not silent:
+
+- It **refuses to start** if `RACECAR_GATEWAY_STATE_DIR` points inside the image
+  tree (e.g. under `/app`), because Railway replaces that tree on every redeploy
+  — state kept there is guaranteed to be deleted on each update.
+- It writes a persistence marker into the volume and re-reads it on every boot.
+  If the marker survived, the boot log reads `resumed persistent state directory
+  (first seen …, boot #N)`. If it is missing after a redeploy or restart, the
+  log warns that the directory is **not** on a persistent volume and prior
+  project/Overlord state was lost — check the volume mount and
+  `RACECAR_GATEWAY_STATE_DIR` before real work is claimed.
+
 ## Variables
 
 See [`../../docs/gateway.md`](../../docs/gateway.md) for the authoritative table.

@@ -70,6 +70,25 @@ target and the state lives on one volume, so a second replica double-claims
 work. See [`../deploy/railway/README.md`](../deploy/railway/README.md) for the
 full service/volume/variable setup.
 
+## State durability preflight
+
+Before it claims any work, the gateway preflights `RACECAR_GATEWAY_STATE_DIR`
+so a lost volume never silently re-claims already-claimed Overlord work or
+discards the `.racecar` project/Overlord state:
+
+- It **refuses to start** when the state directory resolves inside the running
+  image tree (the Dockerfile `WORKDIR`, `/app`). A container platform replaces
+  that tree on every redeploy, so state kept there is deleted on each update —
+  the exact "project/Overlord information deletes on every push" failure.
+- It writes a persistence marker
+  (`<state-dir>/.racecar/gateway-state/persistence.json`) recording the device
+  fingerprint, first-seen time, and a boot counter, then re-reads it on every
+  boot. A surviving marker logs `resumed persistent state directory (first seen
+  …, boot #N)`; a missing marker after a redeploy or restart logs that the
+  directory is not on a persistent volume and prior state was lost. A device
+  fingerprint that differs from the one that initialised the directory is
+  warned about, since it must stay stable across restarts and redeploys.
+
 ## Raspberry Pi
 
 Copy `deploy/raspberry-pi/docker-compose.yml` and create a sibling `.env` with

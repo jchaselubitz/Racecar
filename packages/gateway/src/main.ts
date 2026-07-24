@@ -8,6 +8,7 @@ import { gatewayProvider, ShimLaunchAdapter } from './launch-adapter.js';
 import type { RunnerClaimResponse, RunnerFailureBody } from './overlord-runner-contract.js';
 import { OverlordProtocolBridge } from './protocol-bridge.js';
 import { SandboxWaker, type RunnerQueueStatus } from './sandbox-waker.js';
+import { describeDurability, ensureDurableStateDir } from './state-durability.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -383,5 +384,20 @@ async function wakeLoop(): Promise<void> {
     await delay(config.pollMs);
   }
 }
+
+/**
+ * Fail fast (or at least log loudly) if the state directory cannot survive a
+ * redeploy, before any work is claimed. A wiped state directory silently
+ * re-claims already-claimed Overlord work and loses the `.racecar`
+ * project/Overlord state, so this runs ahead of the claim loop.
+ */
+const durability = await ensureDurableStateDir({
+  stateDirectory: config.stateDirectory,
+  deviceFingerprint: config.deviceFingerprint,
+  instanceId: config.instanceId,
+  now: () => new Date(),
+});
+process.stderr.write(`${describeDurability(durability)}\n`);
+for (const warning of durability.warnings) process.stderr.write(`gateway: ${warning}\n`);
 
 await Promise.all([claimLoop(), wakeLoop()]);
