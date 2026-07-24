@@ -43,13 +43,17 @@ by [`planning/gateway-runner-reuse.md`](../planning/gateway-runner-reuse.md).
 
 ## Railway
 
-Create a Railway service from this repository and use
+Deploy the prebuilt image `ghcr.io/jchaselubitz/racecar-gateway` (published by
+`.github/workflows/publish-gateway.yml`), or build from this repository with
 `deploy/railway/Dockerfile`. Railway reads `deploy/railway/railway.toml` for
 the `/healthz` probe. Set every required variable in Railway's secret manager
 and mount a persistent volume at `RACECAR_GATEWAY_STATE_DIR`. The gateway keeps
 the request → sandbox → ACP-session mapping there, so an ephemeral filesystem
 would allow a restart to create a second agent run for an already-claimed
-Overlord request.
+Overlord request. Run a single replica: the device fingerprint keys one Overlord
+target and the state lives on one volume, so a second replica double-claims
+work. See [`../deploy/railway/README.md`](../deploy/railway/README.md) for the
+full service/volume/variable setup.
 
 ## Raspberry Pi
 

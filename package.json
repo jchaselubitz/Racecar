@@ -1,6 +1,6 @@
 {
-  "name": "racecar",
-  "version": "0.0.0",
+  "name": "racecar-cli",
+  "version": "0.1.0",
   "private": true,
   "packageManager": "yarn@4.17.0",
   "engines": {
