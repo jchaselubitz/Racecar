@@ -1,4 +1,4 @@
-contractVersion: '4'
+contractVersion: '27'
 componentType: rest-consumer
 componentKey: racecar
 label: 'Racecar Overlord Gateway'
@@ -7,9 +7,9 @@ restConsumer:
   authMechanisms: [bearer-token]
   vendoredContractPath: packages/gateway/src/overlord-runner-contract.ts
   endpoints:
-    - { method: POST, path: /api/runner/claim }
+    - { method: POST, path: /api/runner/claim, responseType: RunnerClaimResponse }
     - { method: POST, path: /api/runner/requests/:id/launching }
     - { method: POST, path: /api/runner/requests/:id/launched }
-    - { method: POST, path: /api/runner/requests/:id/failed }
-    - { method: GET, path: /api/runner/status }
+    - { method: POST, path: /api/runner/requests/:id/failed, requestBodyType: RunnerFailureBody }
+    - { method: GET, path: /api/runner/status, responseType: RunnerQueueStatus }
   exportedTypes: [RunnerClaim, RunnerClaimResponse, RunnerQueueStatus, RunnerFailureBody]

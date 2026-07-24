@@ -36,7 +36,7 @@ let healthy = false;
  */
 async function runOnce(): Promise<void> {
   const claim = await runnerPost<RunnerClaimResponse>('/api/runner/claim', {});
-  if (claim.request === undefined) return;
+  if (claim.request == null) return;
   const request = claim.request;
   await runnerPost(`/api/runner/requests/${encodeURIComponent(request.id)}/launching`);
   let recorded = false;

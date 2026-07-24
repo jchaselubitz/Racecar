@@ -43,7 +43,10 @@ export interface RunnerClaim {
 
 /** Response body of `POST /api/runner/claim`. */
 export interface RunnerClaimResponse {
-  readonly request?: RunnerClaim;
+  /** Absent/`null` when the queue had nothing to claim. */
+  readonly request?: RunnerClaim | null;
+  /** Additive since contract v23 (`true` on Postgres long-poll). */
+  readonly longPoll?: boolean;
 }
 
 /**
