@@ -2758,6 +2758,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"husky@npm:^9.1.7":
+  version: 9.1.7
+  resolution: "husky@npm:9.1.7"
+  bin:
+    husky: bin.js
+  checksum: 10/c2412753f15695db369634ba70f50f5c0b7e5cb13b673d0826c411ec1bd9ddef08c1dad89ea154f57da2521d2605bd64308af748749b27d08c5f563bcd89975f
+  languageName: node
+  linkType: hard
+
 "ieee754@npm:^1.1.4":
   version: 1.2.1
   resolution: "ieee754@npm:1.2.1"
@@ -2915,6 +2924,23 @@ __metadata:
     prelude-ls: "npm:^1.2.1"
     type-check: "npm:~0.4.0"
   checksum: 10/2e4720ff79f21ae08d42374b0a5c2f664c5be8b6c8f565bb4e1315c96ed3a8acaa9de788ffed82d7f2378cf36958573de07ef92336cb5255ed74d08b8318c9ee
+  languageName: node
+  linkType: hard
+
+"lint-staged@npm:^17.2.0":
+  version: 17.2.0
+  resolution: "lint-staged@npm:17.2.0"
+  dependencies:
+    picomatch: "npm:^4.0.5"
+    string-argv: "npm:^0.3.2"
+    tinyexec: "npm:^1.2.4"
+    yaml: "npm:^2.9.0"
+  dependenciesMeta:
+    yaml:
+      optional: true
+  bin:
+    lint-staged: bin/lint-staged.js
+  checksum: 10/7c26129d6dd27f20d8fc8d70b13252f15baf569124721d7f5e9ed289e054ed43f5cc2a35de4129b65a7c7f1ad4a5900859a7488f8a1f0b96428b995b29ec2ba8
   languageName: node
   linkType: hard
 
@@ -3220,7 +3246,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"picomatch@npm:^4.0.4":
+"picomatch@npm:^4.0.4, picomatch@npm:^4.0.5":
   version: 4.0.5
   resolution: "picomatch@npm:4.0.5"
   checksum: 10/8bad770af9dcdb7f94ad1a893adcbe08a97d75a18872f8fed37161d3124217471c402b3929f051532f795f4ff2e53dcebb1644df4c1a5f3a9c476fef3b9f8c51
@@ -3301,14 +3327,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"racecar-cli@workspace:.":
+"racecar@workspace:.":
   version: 0.0.0-use.local
-  resolution: "racecar-cli@workspace:."
+  resolution: "racecar@workspace:."
   dependencies:
     "@eslint/js": "npm:^9.17.0"
     "@types/node": "npm:^24.0.0"
     eslint: "npm:^9.17.0"
     eslint-config-prettier: "npm:^9.1.0"
+    husky: "npm:^9.1.7"
+    lint-staged: "npm:^17.2.0"
     prettier: "npm:^3.4.2"
     rimraf: "npm:^6.0.1"
     typescript: "npm:^5.7.2"
@@ -3554,6 +3582,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"string-argv@npm:^0.3.2":
+  version: 0.3.2
+  resolution: "string-argv@npm:0.3.2"
+  checksum: 10/f9d3addf887026b4b5f997a271149e93bf71efc8692e7dc0816e8807f960b18bcb9787b45beedf0f97ff459575ee389af3f189d8b649834cac602f2e857e75af
+  languageName: node
+  linkType: hard
+
 "string-width@npm:^4.1.0, string-width@npm:^4.2.0, string-width@npm:^4.2.3":
   version: 4.2.3
   resolution: "string-width@npm:4.2.3"
@@ -3623,6 +3658,13 @@ __metadata:
   version: 0.3.2
   resolution: "tinyexec@npm:0.3.2"
   checksum: 10/b9d5fed3166fb1acd1e7f9a89afcd97ccbe18b9c1af0278e429455f6976d69271ba2d21797e7c36d57d6b05025e525d2882d88c2ab435b60d1ddf2fea361de57
+  languageName: node
+  linkType: hard
+
+"tinyexec@npm:^1.2.4":
+  version: 1.2.4
+  resolution: "tinyexec@npm:1.2.4"
+  checksum: 10/f20b3e6f56f24c3ebe0129d0b6e657e561d225df2cf93c1a10362996232dd6ad4b8af8c9e81d258a64d09020e723772baf6fe0be26512dba7c61bb366d67b1f9
   languageName: node
   linkType: hard
 
@@ -3952,7 +3994,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"yaml@npm:^2.0.0":
+"yaml@npm:^2.0.0, yaml@npm:^2.9.0":
   version: 2.9.0
   resolution: "yaml@npm:2.9.0"
   bin:

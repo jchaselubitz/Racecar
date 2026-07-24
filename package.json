@@ -1,5 +1,5 @@
 {
-  "name": "racecar-cli",
+  "name": "racecar",
   "version": "0.1.0",
   "packageManager": "yarn@4.17.0",
   "engines": {
@@ -17,13 +17,25 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{js,mjs,cjs,json,jsonc,yaml,yml,md,css,html}": [
+      "prettier --write"
+    ]
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
     "@types/node": "^24.0.0",
     "eslint": "^9.17.0",
     "eslint-config-prettier": "^9.1.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.2.0",
     "prettier": "^3.4.2",
     "rimraf": "^6.0.1",
     "typescript": "^5.7.2",
