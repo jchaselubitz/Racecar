@@ -337,6 +337,11 @@ export class OverlordProtocolBridge {
       OVERLORD_BACKEND_URL: this.#config.backendUrl,
       OVERLORD_USER_TOKEN: this.#config.token,
       OVERLORD_DEVICE_FINGERPRINT: this.#config.deviceFingerprint,
+      // Carry the display label alongside the identity fingerprint so an `ovld`
+      // device registration surfaces the same target name as the runner header.
+      ...(this.#config.gatewayName !== undefined
+        ? { OVERLORD_DEVICE_LABEL: this.#config.gatewayName }
+        : {}),
     };
   }
 

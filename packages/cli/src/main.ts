@@ -62,6 +62,7 @@ import {
 import { banner, option, parseArgs, requireOption, shellQuote } from './index.js';
 import { attachToSandbox } from './attach.js';
 import { auth } from './auth.js';
+import { setup } from './setup.js';
 import { chatWithSandbox } from './chat.js';
 import {
   installOutputRedaction,
@@ -1343,7 +1344,7 @@ async function snapshotCheck(args: readonly string[]): Promise<void> {
 }
 
 function usage(): string {
-  return `${banner()}\n\nUsage:\n  racecar project init [--name <name>] [--repo <url>] [--branch <branch>] [--auto-rebuild-snapshot] [--egress-allowlist <domain,...>]\n  racecar snapshot build --project <project> [--base-image <image>]\n  racecar snapshot check --project <project> [--lockfile-hash <hash>] [--rebuild]\n  racecar sandbox create --project <project> --mission <name> [--branch <branch>] [--base-branch <branch>] [--shared] [--resource-class <${Object.keys(RESOURCE_CLASSES).join('|')}>] [--labels-json <object>] [--workspace-context-file <path>]\n  racecar sandbox stop|start|rm <sandbox-id>\n  racecar ps [--project <project>] [--watch --interval <seconds>]\n  racecar quota [--project <project>]\n  racecar attach <sandbox-id>\n  racecar run <sandbox-id> "<prompt>" [--agent <${knownAgents().join('|')}>] [--timeout <seconds>]\n  racecar runs <sandbox-id>\n  racecar chat <sandbox-id> ["<prompt>"] [--run <run-id>]\n  racecar msg send <sandbox-id> "<text>" [--session <run-id>]\n  racecar msg reply <sandbox-id> <message-id> "<text>"\n  racecar inbox [--project <project>] [--sandbox <sandbox-id>] [--unread]\n  racecar reconcile [--project <project>] [--dry-run] [--max-run-minutes <n>]\n  racecar audit [--project <project>]\n  racecar integration status [--resource <key>] [--mission <id>] [--entry <id>]\n  racecar integration enqueue --mission <id> --head <sha> [--branch <name>] [--resource <key>] [--priority <low|normal|high>]\n  racecar integration approve|dequeue --entry <id> [--resource <key>]\n  racecar integration retry --entry <id> --head <sha> [--resource <key>]\n  racecar integration run --once [--resource <key>]\n  racecar shim rotate-token <sandbox-id>\n  racecar auth claude [--token <t>] [--stdin]\n  racecar auth git [--host <h>] [--username <u>] [--token <t>] [--stdin]\n  racecar auth list | rm <name>\n  racecar auth revoke <name> [--stop-sandboxes]\n\nAdd --json to any command for an NDJSON event stream on stdout.\n\nResource classes (estimated spend in 'racecar ps'): ${Object.values(
+  return `${banner()}\n\nUsage:\n  racecar project init [--name <name>] [--repo <url>] [--branch <branch>] [--auto-rebuild-snapshot] [--egress-allowlist <domain,...>]\n  racecar snapshot build --project <project> [--base-image <image>]\n  racecar snapshot check --project <project> [--lockfile-hash <hash>] [--rebuild]\n  racecar sandbox create --project <project> --mission <name> [--branch <branch>] [--base-branch <branch>] [--shared] [--resource-class <${Object.keys(RESOURCE_CLASSES).join('|')}>] [--labels-json <object>] [--workspace-context-file <path>]\n  racecar sandbox stop|start|rm <sandbox-id>\n  racecar ps [--project <project>] [--watch --interval <seconds>]\n  racecar quota [--project <project>]\n  racecar attach <sandbox-id>\n  racecar run <sandbox-id> "<prompt>" [--agent <${knownAgents().join('|')}>] [--timeout <seconds>]\n  racecar runs <sandbox-id>\n  racecar chat <sandbox-id> ["<prompt>"] [--run <run-id>]\n  racecar msg send <sandbox-id> "<text>" [--session <run-id>]\n  racecar msg reply <sandbox-id> <message-id> "<text>"\n  racecar inbox [--project <project>] [--sandbox <sandbox-id>] [--unread]\n  racecar reconcile [--project <project>] [--dry-run] [--max-run-minutes <n>]\n  racecar audit [--project <project>]\n  racecar integration status [--resource <key>] [--mission <id>] [--entry <id>]\n  racecar integration enqueue --mission <id> --head <sha> [--branch <name>] [--resource <key>] [--priority <low|normal|high>]\n  racecar integration approve|dequeue --entry <id> [--resource <key>]\n  racecar integration retry --entry <id> --head <sha> [--resource <key>]\n  racecar integration run --once [--resource <key>]\n  racecar shim rotate-token <sandbox-id>\n  racecar setup\n  racecar auth claude [--token <t>] [--stdin]\n  racecar auth git [--host <h>] [--username <u>] [--token <t>] [--stdin]\n  racecar auth list | rm <name>\n  racecar auth revoke <name> [--stop-sandboxes]\n\nAdd --json to any command for an NDJSON event stream on stdout.\n\nResource classes (estimated spend in 'racecar ps'): ${Object.values(
     RESOURCE_CLASSES,
   )
     .map((c) => `${c.name} (${formatUsd(c.hourlyUsd)}/hr)`)
@@ -1411,6 +1412,10 @@ async function main(rawArgv: readonly string[]): Promise<void> {
     if (command === 'run') return integrationRun(parseArgs(rest));
     throw new Error(`unknown integration command '${command ?? ''}'\n\n${usage()}`);
   }
+  if (group === 'setup')
+    return setup(
+      parseArgs([command, ...rest].filter((part): part is string => part !== undefined)),
+    );
   if (group === 'shim' && command === 'rotate-token') return shimRotate(rest);
   if (group === 'auth') {
     if (command === 'revoke') return authRevoke(rest);

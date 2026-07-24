@@ -10,9 +10,11 @@ import {
 } from './tmux.js';
 
 describe('tmux session scripts', () => {
-  it('bakes tmux into the snapshot recipe', () => {
+  it('bakes tmux and git into the snapshot recipe', () => {
     expect(TMUX_SETUP_COMMANDS.join('\n')).toContain('apt-get install');
     expect(TMUX_SETUP_COMMANDS.join('\n')).toContain('tmux');
+    // git is required for the build-time clone and every runtime fetch/checkout.
+    expect(TMUX_SETUP_COMMANDS.join('\n')).toContain('git');
   });
 
   it('creates the session idempotently and detached', () => {

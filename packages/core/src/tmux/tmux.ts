@@ -18,14 +18,16 @@
 export const TMUX_SESSION = 'racecar';
 
 /**
- * Setup commands baked into a snapshot so tmux is present at runtime. The
- * `node:24-bookworm-slim` base image ships without it (see the Stage 0
- * findings), so the snapshot recipe installs it once at build time rather than
- * paying an apt round-trip on every sandbox create.
+ * Base tooling baked into every snapshot at build time. The
+ * `node:24-bookworm-slim` base image ships without `tmux` *or* `git` (see the
+ * Stage 0 findings), yet the snapshot recipe needs both: `tmux` for the named
+ * per-sandbox session that runs and attach connect to, and `git` for the
+ * build-time repo clone (and every runtime fetch/checkout). Installing them once
+ * here avoids an apt round-trip on every sandbox create.
  */
 export const TMUX_SETUP_COMMANDS: readonly string[] = [
   'apt-get update',
-  'DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tmux',
+  'DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tmux git',
   'rm -rf /var/lib/apt/lists/*',
 ];
 

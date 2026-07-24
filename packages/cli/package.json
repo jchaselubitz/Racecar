@@ -1,6 +1,6 @@
 {
   "name": "racecar-cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Agent-agnostic, launcher-agnostic control-plane CLI for cloud coding sandboxes.",
   "license": "MIT",
   "author": "Jake Chase-Lubitz",

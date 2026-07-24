@@ -21,6 +21,7 @@ contract.
 | `RACECAR_GATEWAY_DEVICE_FINGERPRINT` | yes | Stable, opaque 32-hex device fingerprint for this logical gateway target. Generate once and keep unchanged across restarts, rebuilds, redeploys, and token rotation. See [`planning/gateway-device-fingerprint-decision.md`](../planning/gateway-device-fingerprint-decision.md). |
 | `RACECAR_GATEWAY_STATE_DIR` | yes | A persistent, writable host/volume directory containing the `.racecar` project state and gateway request map. It must survive restarts and redeploys. |
 | `RACECAR_GATEWAY_INSTANCE_ID` | recommended | Stable UUID for this deployment. Persist it across restarts. |
+| `GATEWAY_NAME` | no | Human-friendly label for this gateway, sent to Overlord as the device label so it becomes the default execution-target name operators see. Display-only and safe to change; unset falls back to `RACECAR_GATEWAY_INSTANCE_ID`. |
 | `RACECAR_GATEWAY_POLL_MS` | no | Claim/wake poll interval; defaults to `5000`. |
 | `RACECAR_GATEWAY_BRANCH_STRATEGY` | no | Gateway-wide branching policy: `per-mission` (a dedicated branch/sandbox per mission) or `shared` (all missions in a project share one branch/sandbox, avoiding per-mission merges). Overrides Overlord's per-mission `mission.branch` decision; a per-claim launch mode still wins. Unset keeps the historical per-claim/Overlord defaults. |
 | `RACECAR_GATEWAY_SHARED_BRANCH` | no | Branch used by the `shared` strategy; defaults to the project/Overlord base branch. Ignored unless `RACECAR_GATEWAY_BRANCH_STRATEGY=shared`. |

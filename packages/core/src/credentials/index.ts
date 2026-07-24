@@ -34,6 +34,8 @@ export {
   GIT_CREDENTIALS_ENV,
   DEFAULT_GIT_HOST,
   DEFAULT_GIT_USERNAME,
+  GH_AUTH_TOKEN_ENV,
+  GH_USERNAME_ENV,
 } from './injection.js';
 
 export { extractClaudeToken } from './claude.js';

@@ -88,7 +88,7 @@ async function authGit(parsed: ParsedArgs): Promise<void> {
   );
 }
 
-async function authList(): Promise<void> {
+export async function authList(): Promise<void> {
   const store = openCredentialStore();
   const map = await store.load();
   const names = Object.keys(map).sort();

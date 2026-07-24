@@ -1,6 +1,6 @@
 {
   "name": "racecar",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "packageManager": "yarn@4.17.0",
   "engines": {
     "node": ">=24"
@@ -20,6 +20,7 @@
     "gateway:cli-versions:check": "node scripts/update-gateway-cli-versions.mjs --check",
     "test": "vitest run",
     "test:watch": "vitest",
+    "publish:cli": "yarn workspace racecar-cli exec npm publish",
     "prepare": "husky"
   },
   "lint-staged": {

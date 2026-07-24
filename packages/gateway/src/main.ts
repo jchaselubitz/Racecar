@@ -305,7 +305,7 @@ async function runnerRequest<T = unknown>(
       ...(body === undefined ? {} : { 'content-type': 'application/json' }),
       authorization: `Bearer ${config.token}`,
       'x-overlord-device-fingerprint': config.deviceFingerprint,
-      'x-overlord-device-label': config.instanceId,
+      'x-overlord-device-label': config.gatewayName ?? config.instanceId,
       'x-overlord-device-platform': 'racecar-gateway',
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),

@@ -20,6 +20,13 @@ export interface GatewayConfig {
   /** Persistent host/volume directory containing Racecar and gateway state. */
   stateDirectory: string;
   instanceId: string;
+  /**
+   * Human-friendly label for this gateway, sent to Overlord as the device label
+   * so it becomes the default execution-target name operators see. Unlike
+   * `deviceFingerprint` (the stable identity key) this is display-only and may be
+   * changed freely. Falls back to `instanceId` when unset.
+   */
+  gatewayName?: string;
   pollMs: number;
   port: number;
   /**
@@ -58,6 +65,7 @@ const branchStrategy = (value: string | undefined): GatewayBranchStrategy | unde
 export function loadConfig(env = process.env): GatewayConfig {
   const strategy = branchStrategy(env.RACECAR_GATEWAY_BRANCH_STRATEGY);
   const shared = env.RACECAR_GATEWAY_SHARED_BRANCH?.trim();
+  const gatewayName = env.GATEWAY_NAME?.trim();
   return {
     backendUrl: required('OVERLORD_BACKEND_URL', env).replace(/\/$/, ''),
     token: required('OVERLORD_USER_TOKEN', env),
@@ -66,6 +74,7 @@ export function loadConfig(env = process.env): GatewayConfig {
     instanceId: env.RACECAR_GATEWAY_INSTANCE_ID ?? randomUUID(),
     pollMs: positive('RACECAR_GATEWAY_POLL_MS', env.RACECAR_GATEWAY_POLL_MS, 5000),
     port: positive('PORT', env.PORT, 8080),
+    ...(gatewayName !== undefined && gatewayName.length > 0 ? { gatewayName } : {}),
     ...(strategy !== undefined ? { branchStrategy: strategy } : {}),
     ...(shared !== undefined && shared.length > 0 ? { sharedBranch: shared } : {}),
   };

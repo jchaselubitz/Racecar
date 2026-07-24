@@ -62,6 +62,7 @@ Recommended / optional:
 | Variable | Notes |
 | --- | --- |
 | `RACECAR_GATEWAY_INSTANCE_ID` | Stable UUID for this deployment |
+| `GATEWAY_NAME` | Human-friendly device label Overlord shows as the default execution-target name; display-only, falls back to the instance ID |
 | `RACECAR_GATEWAY_POLL_MS` | Claim/wake poll interval; default `5000` |
 | `RACECAR_GATEWAY_BRANCH_STRATEGY` | `per-mission` or `shared` |
 | `RACECAR_GATEWAY_SHARED_BRANCH` | Branch for the `shared` strategy |

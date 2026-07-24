@@ -131,10 +131,16 @@ prompts. Racecar therefore treats credentials as first-class per-user objects
 injected at sandbox creation:
 
 ```bash
+racecar setup         # guided: seeds every credential from env, then prompts for the rest
 racecar auth claude   # runs `claude setup-token`; stores the 1-year subscription token
 racecar auth codex    # Codex device-auth equivalent
 racecar auth git      # deploy key / push token
 ```
+
+`racecar setup` is the one-shot path: it reads `CLAUDE_CODE_OAUTH_TOKEN` and
+`GH_AUTH_TOKEN`/`GH_USERNAME` from the environment when present, leaves
+credentials already in the store untouched, requests anything still missing
+interactively (masked), and finishes by printing `auth list`.
 
 Stored credentials are injected as environment variables (e.g.
 `CLAUDE_CODE_OAUTH_TOKEN`) or 0600 files when each sandbox is created. The

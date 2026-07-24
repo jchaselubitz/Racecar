@@ -25,6 +25,14 @@ export const GIT_CREDENTIALS_ENV = 'RACECAR_GIT_CREDENTIALS';
 export const DEFAULT_GIT_HOST = 'github.com';
 export const DEFAULT_GIT_USERNAME = 'x-access-token';
 
+/**
+ * Env vars `racecar setup` reads to seed a GitHub credential non-interactively:
+ * `GH_AUTH_TOKEN` carries the personal access token, `GH_USERNAME` the login
+ * (falling back to {@link DEFAULT_GIT_USERNAME} when unset).
+ */
+export const GH_AUTH_TOKEN_ENV = 'GH_AUTH_TOKEN';
+export const GH_USERNAME_ENV = 'GH_USERNAME';
+
 /** Input for a Claude credential. */
 export interface ClaudeCredentialInput {
   readonly oauthToken: string;
