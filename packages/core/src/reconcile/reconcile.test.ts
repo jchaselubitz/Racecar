@@ -121,7 +121,7 @@ describe('executeReconciliation', () => {
     const provider = new FakeSandboxProvider({
       execHandler: () => ({ exitCode: 0, output: 'boom: SECRET_VALUE_XYZ leaked' }),
     });
-    await provider.buildSnapshot({ name: 'snap', baseImage: 'node:22' });
+    await provider.buildSnapshot({ name: 'snap', baseImage: 'node:24' });
     const created = await provider.createSandbox({ snapshot: 'snap', name: 'orphan' });
 
     const persisted: LogArtifact[] = [];
@@ -153,7 +153,7 @@ describe('executeReconciliation', () => {
 
   it('stops a sandbox with a stuck run and records the failure of a bad action', async () => {
     const provider = new FakeSandboxProvider();
-    await provider.buildSnapshot({ name: 'snap', baseImage: 'node:22' });
+    await provider.buildSnapshot({ name: 'snap', baseImage: 'node:24' });
     const live = await provider.createSandbox({ snapshot: 'snap', name: 'live' });
 
     const results = await executeReconciliation(
@@ -172,7 +172,7 @@ describe('executeReconciliation', () => {
 
   it('wraps each provider op with the supplied withOp hook', async () => {
     const provider = new FakeSandboxProvider();
-    await provider.buildSnapshot({ name: 'snap', baseImage: 'node:22' });
+    await provider.buildSnapshot({ name: 'snap', baseImage: 'node:24' });
     const created = await provider.createSandbox({ snapshot: 'snap', name: 'wrapme' });
     await provider.stopSandbox(created.id);
     let wrapped = 0;

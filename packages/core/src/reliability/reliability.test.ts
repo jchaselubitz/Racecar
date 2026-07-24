@@ -103,7 +103,7 @@ describe('retryWithBackoff', () => {
 describe('RetryingProvider', () => {
   it('retries a rate-limited provider call transparently', async () => {
     const inner = new FakeSandboxProvider();
-    await inner.buildSnapshot({ name: 'snap', baseImage: 'node:22' });
+    await inner.buildSnapshot({ name: 'snap', baseImage: 'node:24' });
     let attempts = 0;
     const flaky = inner.createSandbox.bind(inner);
     vi.spyOn(inner, 'createSandbox').mockImplementation(async (request) => {

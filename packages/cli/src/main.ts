@@ -93,7 +93,7 @@ const STATE_DIR = '.racecar';
 const PROJECTS_DIR = 'projects';
 const SNAPSHOTS_DIR = 'snapshots';
 const ARTIFACTS_DIR = 'artifacts';
-const DEFAULT_IMAGE = 'node:22-bookworm-slim';
+const DEFAULT_IMAGE = 'node:24-bookworm-slim';
 /** Org-wide quota config, applied across every project. */
 const QUOTA_FILE = 'quota.json';
 

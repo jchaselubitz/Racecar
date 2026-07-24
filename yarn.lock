@@ -1229,7 +1229,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@racecar/cli@workspace:packages/cli":
+"@racecar/cli@workspace:^, @racecar/cli@workspace:packages/cli":
   version: 0.0.0-use.local
   resolution: "@racecar/cli@workspace:packages/cli"
   dependencies:
@@ -1253,6 +1253,10 @@ __metadata:
 "@racecar/gateway@workspace:packages/gateway":
   version: 0.0.0-use.local
   resolution: "@racecar/gateway@workspace:packages/gateway"
+  dependencies:
+    "@racecar/cli": "workspace:^"
+    "@racecar/core": "workspace:^"
+    "@racecar/shim": "workspace:^"
   bin:
     racecar-gateway: ./dist/main.js
   languageName: unknown
@@ -3297,9 +3301,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"racecar@workspace:.":
+"racecar-cli@workspace:.":
   version: 0.0.0-use.local
-  resolution: "racecar@workspace:."
+  resolution: "racecar-cli@workspace:."
   dependencies:
     "@eslint/js": "npm:^9.17.0"
     "@types/node": "npm:^22.10.0"

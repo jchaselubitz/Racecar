@@ -19,7 +19,7 @@ export const TMUX_SESSION = 'racecar';
 
 /**
  * Setup commands baked into a snapshot so tmux is present at runtime. The
- * `node:22-bookworm-slim` base image ships without it (see the Stage 0
+ * `node:24-bookworm-slim` base image ships without it (see the Stage 0
  * findings), so the snapshot recipe installs it once at build time rather than
  * paying an apt round-trip on every sandbox create.
  */

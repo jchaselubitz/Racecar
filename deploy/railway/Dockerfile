@@ -1,16 +1,15 @@
-FROM node:22-bookworm-slim AS build
+FROM node:24-bookworm-slim AS build
 WORKDIR /app
 RUN corepack enable
 COPY package.json yarn.lock .yarnrc.yml ./
-COPY .yarn .yarn
 COPY tsconfig.json tsconfig.base.json ./
 COPY packages/core packages/core
 COPY packages/cli packages/cli
 COPY packages/shim packages/shim
 COPY packages/gateway packages/gateway
-RUN yarn install --immutable && yarn workspace @racecar/gateway build
+RUN yarn install --immutable && yarn build
 
-FROM node:22-bookworm-slim
+FROM node:24-bookworm-slim
 WORKDIR /app
 RUN corepack enable
 COPY --from=build /app /app

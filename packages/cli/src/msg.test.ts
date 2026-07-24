@@ -73,7 +73,7 @@ afterEach(async () => {
 /** Stand up N mailbox-backed shims and a managed sandbox in front of each. */
 async function fixture(missions: readonly string[]): Promise<Fixture> {
   const provider = new MultiShimProvider();
-  await provider.buildSnapshot({ name: 'snap', baseImage: 'node:22' });
+  await provider.buildSnapshot({ name: 'snap', baseImage: 'node:24' });
   const mailboxes = new Map<string, Mailbox>();
   for (const mission of missions) {
     const mailbox = new Mailbox();
@@ -301,7 +301,7 @@ async function deliveryFixture(
   agents: Record<string, Agent>,
 ): Promise<{ provider: MultiShimProvider; ids: Record<string, string> }> {
   const provider = new MultiShimProvider();
-  await provider.buildSnapshot({ name: 'snap', baseImage: 'node:22' });
+  await provider.buildSnapshot({ name: 'snap', baseImage: 'node:24' });
   const ids: Record<string, string> = {};
   for (const [mission, agent] of Object.entries(agents)) {
     const mailbox = new Mailbox();

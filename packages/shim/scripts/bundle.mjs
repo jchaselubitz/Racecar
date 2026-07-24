@@ -19,7 +19,7 @@ await build({
   outfile: resolve(root, 'dist/racecar-shim.cjs'),
   bundle: true,
   platform: 'node',
-  target: 'node22',
+  target: 'node24',
   format: 'cjs',
   minify: true,
   // `bufferutil`/`utf-8-validate` are optional native speedups `ws` loads at

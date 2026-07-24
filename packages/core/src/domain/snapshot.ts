@@ -15,7 +15,7 @@ export interface Snapshot {
   readonly name: string;
   /** Project this snapshot was built for. */
   readonly project: string;
-  /** Base image the snapshot was built from (e.g. `node:22-bookworm-slim`). */
+  /** Base image the snapshot was built from (e.g. `node:24-bookworm-slim`). */
   readonly baseImage: string;
   /**
    * Hash of the dependency lockfile baked into the snapshot. Used to detect

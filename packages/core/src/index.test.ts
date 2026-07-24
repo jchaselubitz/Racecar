@@ -18,7 +18,7 @@ describe('@racecar/core scaffold', () => {
       now: () => new Date('2026-07-10T12:00:00.000Z'),
       idPrefix: 'validation',
     });
-    await provider.buildSnapshot({ name: 'racecar-snapshot', baseImage: 'node:22' });
+    await provider.buildSnapshot({ name: 'racecar-snapshot', baseImage: 'node:24' });
     const labels = encodeSandboxLabels({
       project: 'racecar',
       mission: 'coo-246',
@@ -46,7 +46,7 @@ describe('@racecar/core scaffold', () => {
 
   it('enforces stop-before-archive and supports a complete fake lifecycle', async () => {
     const provider = new FakeSandboxProvider();
-    await provider.buildSnapshot({ name: 'racecar-snapshot', baseImage: 'node:22' });
+    await provider.buildSnapshot({ name: 'racecar-snapshot', baseImage: 'node:24' });
     const sandbox = await provider.createSandbox({ snapshot: 'racecar-snapshot' });
 
     await expect(provider.archiveSandbox(sandbox.id)).rejects.toBeInstanceOf(ProviderConflictError);

@@ -9,7 +9,7 @@ the unified [post-v1 Racecar–Overlord plan](post-v1-overlord-racecar-plan.md).
 That successor plan covers local and always-online Racecar execution targets,
 self-hosted gateway packaging, and mission Git integration.
 
-Stack: TypeScript, Node 22, Yarn workspaces. Packages: `packages/core`,
+Stack: TypeScript, Node 24, Yarn workspaces. Packages: `packages/core`,
 `packages/cli`, `packages/shim`.
 
 ## Stage 0 — Provider spike ✓ complete
@@ -72,7 +72,7 @@ Deliverables:
   send `executeCommand('true')` on an interval ≤ `autoStopInterval / 3`; do
   not use the 1-minute minimum interval for any sandbox that should stay alive.
 - Snapshot recipe: bake in `ws` (for the Stage 3 shim) and `curl`/`iproute2`
-  if lifecycle/health tooling needs them — the `node:22-bookworm-slim` base
+  if lifecycle/health tooling needs them — the `node:24-bookworm-slim` base
   lacks all three. See `spikes/stage0/FINDINGS.md` objective-2 section.
 - Test doubles for the provider adapter; integration tests against a
   dedicated Daytona org.

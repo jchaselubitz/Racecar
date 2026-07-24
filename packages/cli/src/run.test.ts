@@ -49,7 +49,7 @@ async function startShim(captureGit?: CaptureGit): Promise<{ url: string }> {
 }
 
 async function seed(provider: FakeSandboxProvider): Promise<string> {
-  await provider.buildSnapshot({ name: 'snap', baseImage: 'node:22' });
+  await provider.buildSnapshot({ name: 'snap', baseImage: 'node:24' });
   return (await provider.createSandbox({ snapshot: 'snap' })).id;
 }
 

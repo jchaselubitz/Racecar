@@ -220,7 +220,7 @@ order.
 
 ## Stack
 
-TypeScript, Node 22, Yarn (workspaces). Packages:
+TypeScript, Node 24, Yarn (workspaces). Packages:
 
 - `packages/core` — domain model, provider adapter interface, Daytona adapter,
   credential store, quota, reconcile, integration queue, security/firewall.

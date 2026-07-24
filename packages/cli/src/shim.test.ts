@@ -33,7 +33,7 @@ describe('rotateShimToken', () => {
       },
     });
 
-    await provider.buildSnapshot({ name: 'snap', baseImage: 'node:22' });
+    await provider.buildSnapshot({ name: 'snap', baseImage: 'node:24' });
     const { id } = await provider.createSandbox({ snapshot: 'snap' });
     const running = await rotateShimToken(provider, id, 'the-new-token');
     expect(running).toBe(true);
@@ -49,7 +49,7 @@ describe('rotateShimToken', () => {
     const provider = new FakeSandboxProvider({
       execHandler: () => ({ exitCode: 0, output: 'STOPPED\n' }),
     });
-    await provider.buildSnapshot({ name: 'snap', baseImage: 'node:22' });
+    await provider.buildSnapshot({ name: 'snap', baseImage: 'node:24' });
     const { id } = await provider.createSandbox({ snapshot: 'snap' });
     expect(await rotateShimToken(provider, id, 'tok')).toBe(false);
   });

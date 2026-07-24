@@ -141,7 +141,7 @@ describe('chatWithSandbox permission prompt', () => {
     servers.push(server);
     const { port } = await server.listen();
     const provider = new ShimBackedProvider(`http://127.0.0.1:${port}`, tokenExec);
-    await provider.buildSnapshot({ name: 'snap', baseImage: 'node:22' });
+    await provider.buildSnapshot({ name: 'snap', baseImage: 'node:24' });
     const id = (await provider.createSandbox({ snapshot: 'snap' })).id;
 
     // The operator answers the permission prompt with option 1 (Allow) — but only

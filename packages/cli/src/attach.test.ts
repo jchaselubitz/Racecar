@@ -13,7 +13,7 @@ async function waitForPty(provider: FakeSandboxProvider, count: number): Promise
 }
 
 async function seed(provider: FakeSandboxProvider): Promise<string> {
-  await provider.buildSnapshot({ name: 'snap', baseImage: 'node:22' });
+  await provider.buildSnapshot({ name: 'snap', baseImage: 'node:24' });
   const sandbox = await provider.createSandbox({ snapshot: 'snap' });
   return sandbox.id;
 }

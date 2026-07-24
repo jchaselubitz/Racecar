@@ -5,7 +5,7 @@ function snapshot(overrides: Partial<Snapshot> = {}): Snapshot {
   return {
     name: 'racecar-snapshot',
     project: 'racecar',
-    baseImage: 'node:22-bookworm-slim',
+    baseImage: 'node:24-bookworm-slim',
     lockfileHash: 'aaa',
     state: 'active',
     createdAt: '2026-07-01T00:00:00.000Z',
