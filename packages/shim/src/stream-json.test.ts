@@ -135,7 +135,8 @@ describe('StreamJsonAgent (tier-2 bridge)', () => {
     expect(writes.map((w) => w.message?.content?.[0]?.text)).toEqual(['go', 'also this']);
     expect(writes.every((w) => w.type === 'user')).toBe(true);
 
-    for (const handler of lineHandlers) handler(JSON.stringify({ type: 'result', is_error: false }));
+    for (const handler of lineHandlers)
+      handler(JSON.stringify({ type: 'result', is_error: false }));
     expect((await turn).stopReason).toBe('end_turn');
   });
 

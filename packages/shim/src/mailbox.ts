@@ -22,11 +22,7 @@
  */
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type {
-  MailboxDirection,
-  MailboxMessage,
-  MailboxMessageKind,
-} from './acp.js';
+import type { MailboxDirection, MailboxMessage, MailboxMessageKind } from './acp.js';
 
 /** The kind a client is allowed to post: user→agent only. */
 export type PostableKind = 'instruction' | 'reply';

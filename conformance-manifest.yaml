@@ -12,5 +12,4 @@ restConsumer:
     - { method: POST, path: /api/runner/requests/:id/launched }
     - { method: POST, path: /api/runner/requests/:id/failed }
     - { method: GET, path: /api/runner/status }
-  exportedTypes:
-    [RunnerClaim, RunnerClaimResponse, RunnerQueueStatus, RunnerFailureBody]
+  exportedTypes: [RunnerClaim, RunnerClaimResponse, RunnerQueueStatus, RunnerFailureBody]

@@ -46,8 +46,8 @@ describe('decideSnapshotRebuild', () => {
   });
 
   it('does not start a second rebuild while one is already building', () => {
-    expect(decideSnapshotRebuild(snapshot({ state: 'building' }), 'bbb', { autoRebuild: true })).toBe(
-      'building',
-    );
+    expect(
+      decideSnapshotRebuild(snapshot({ state: 'building' }), 'bbb', { autoRebuild: true }),
+    ).toBe('building');
   });
 });

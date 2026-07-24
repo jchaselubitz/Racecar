@@ -178,7 +178,9 @@ export class OverlordProtocolBridge {
                 '--changed-files-json',
                 JSON.stringify(changedFiles),
                 '--change-rationales-json',
-                JSON.stringify(changeRationalesForChangedFiles(changedFiles, this.#claim.missionId)),
+                JSON.stringify(
+                  changeRationalesForChangedFiles(changedFiles, this.#claim.missionId),
+                ),
               ]),
         ],
         deliveryCwd,

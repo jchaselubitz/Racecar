@@ -250,12 +250,7 @@ export type MailboxDirection = 'user_to_agent' | 'agent_to_user';
  * agent→user) but carried explicitly so a client renders an inbox without a
  * lookup table.
  */
-export type MailboxMessageKind =
-  | 'instruction'
-  | 'reply'
-  | 'question'
-  | 'update'
-  | 'completion';
+export type MailboxMessageKind = 'instruction' | 'reply' | 'question' | 'update' | 'completion';
 
 /**
  * One durable mailbox message (Racecar extension). Persisted per sandbox and

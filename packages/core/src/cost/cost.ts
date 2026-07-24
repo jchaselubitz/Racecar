@@ -111,7 +111,11 @@ export function resolveResourceClass(
  * `sinceIso`. Returns 0 for a missing/unparseable timestamp or a clock that has
  * run backwards, so a bad label never produces a negative or NaN estimate.
  */
-export function estimateSpendUsd(hourlyUsd: number, sinceIso: string | undefined, now: Date): number {
+export function estimateSpendUsd(
+  hourlyUsd: number,
+  sinceIso: string | undefined,
+  now: Date,
+): number {
   if (sinceIso === undefined) return 0;
   const since = Date.parse(sinceIso);
   if (Number.isNaN(since)) return 0;

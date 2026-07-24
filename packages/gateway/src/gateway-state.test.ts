@@ -85,9 +85,7 @@ describe('GatewayStateStore', () => {
   it('collapses concurrent retries of one request to a single reservation', async () => {
     const state = await store();
 
-    const results = await Promise.all(
-      Array.from({ length: 12 }, () => state.reserve(request)),
-    );
+    const results = await Promise.all(Array.from({ length: 12 }, () => state.reserve(request)));
 
     const fresh = results.filter((result) => !result.reused);
     expect(fresh).toHaveLength(1);
@@ -97,7 +95,11 @@ describe('GatewayStateStore', () => {
   it('rejects all but one of many concurrent requests contending for one assignment', async () => {
     const state = await store();
     const contenders = Array.from({ length: 12 }, (_, index) =>
-      state.reserve({ ...request, executionRequestId: `request-${index}`, sandboxId: `sandbox-${index}` }),
+      state.reserve({
+        ...request,
+        executionRequestId: `request-${index}`,
+        sandboxId: `sandbox-${index}`,
+      }),
     );
 
     const settled = await Promise.allSettled(contenders);
@@ -108,8 +110,7 @@ describe('GatewayStateStore', () => {
     expect(lost).toHaveLength(contenders.length - 1);
     expect(
       lost.every(
-        (result) =>
-          result.status === 'rejected' && /already active/.test(String(result.reason)),
+        (result) => result.status === 'rejected' && /already active/.test(String(result.reason)),
       ),
     ).toBe(true);
   });

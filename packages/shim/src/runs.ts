@@ -96,7 +96,9 @@ function agentTextSince(transcript: readonly SessionUpdate[], start: number): st
 
 /** Elide `text` to {@link COMPLETION_TEXT_LIMIT} characters for a mailbox summary. */
 function truncate(text: string): string {
-  return text.length > COMPLETION_TEXT_LIMIT ? `${text.slice(0, COMPLETION_TEXT_LIMIT - 1)}…` : text;
+  return text.length > COMPLETION_TEXT_LIMIT
+    ? `${text.slice(0, COMPLETION_TEXT_LIMIT - 1)}…`
+    : text;
 }
 
 /** Render a permission request as the human-facing text of a mailbox question. */
@@ -269,10 +271,7 @@ export class Run {
    * drive never run concurrently on the one southbound session), so this may wait
    * behind an in-flight turn before starting.
    */
-  prompt(
-    content: readonly ContentBlock[],
-    prompter: PermissionResponder,
-  ): Promise<PromptResponse> {
+  prompt(content: readonly ContentBlock[], prompter: PermissionResponder): Promise<PromptResponse> {
     return this.#runTurn(content, prompter);
   }
 

@@ -6,12 +6,12 @@ describe('defineProject', () => {
     const project = defineProject({
       name: 'demo',
       repoUrl: 'https://example.com/demo.git',
-      snapshot: 'demo-snapshot'
+      snapshot: 'demo-snapshot',
     });
-    expect(project.resources.map(resource => resource.key)).toEqual(['primary']);
+    expect(project.resources.map((resource) => resource.key)).toEqual(['primary']);
     expect(project.resources[0]).toMatchObject({
       primary: true,
-      workspaceDir: project.workspaceDir
+      workspaceDir: project.workspaceDir,
     });
   });
 
@@ -19,12 +19,12 @@ describe('defineProject', () => {
     const once = defineProject({
       name: 'demo',
       repoUrl: 'https://example.com/demo.git',
-      snapshot: 'demo-snapshot'
+      snapshot: 'demo-snapshot',
     });
     const twice = defineProject(once);
     const thrice = defineProject(twice);
-    expect(twice.resources.map(resource => resource.key)).toEqual(['primary']);
-    expect(thrice.resources.map(resource => resource.key)).toEqual(['primary']);
+    expect(twice.resources.map((resource) => resource.key)).toEqual(['primary']);
+    expect(thrice.resources.map((resource) => resource.key)).toEqual(['primary']);
   });
 
   it('places sibling resources at fixed conventional paths under the primary root', () => {
@@ -32,13 +32,13 @@ describe('defineProject', () => {
       name: 'demo',
       repoUrl: 'https://example.com/demo.git',
       snapshot: 'demo-snapshot',
-      resources: [{ key: 'docs', repoUrl: 'https://example.com/docs.git', branch: 'main' }]
+      resources: [{ key: 'docs', repoUrl: 'https://example.com/docs.git', branch: 'main' }],
     });
-    expect(project.resources.map(resource => resource.key)).toEqual(['primary', 'docs']);
-    const docs = project.resources.find(resource => resource.key === 'docs');
+    expect(project.resources.map((resource) => resource.key)).toEqual(['primary', 'docs']);
+    const docs = project.resources.find((resource) => resource.key === 'docs');
     expect(docs).toMatchObject({
       primary: false,
-      workspaceDir: `${project.workspaceDir}/resources/docs`
+      workspaceDir: `${project.workspaceDir}/resources/docs`,
     });
   });
 
@@ -47,9 +47,9 @@ describe('defineProject', () => {
       name: 'demo',
       repoUrl: 'https://example.com/demo.git',
       snapshot: 'demo-snapshot',
-      resources: [{ key: 'docs', repoUrl: 'https://example.com/docs.git', branch: 'main' }]
+      resources: [{ key: 'docs', repoUrl: 'https://example.com/docs.git', branch: 'main' }],
     });
     const twice = defineProject(once);
-    expect(twice.resources.map(resource => resource.key)).toEqual(['primary', 'docs']);
+    expect(twice.resources.map((resource) => resource.key)).toEqual(['primary', 'docs']);
   });
 });

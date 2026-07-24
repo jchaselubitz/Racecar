@@ -140,7 +140,10 @@ describe('ProcessAcpAgent over an in-memory ACP subprocess', () => {
     });
     const agent = new ProcessAcpAgent(proc);
     const session = await agent.newSession(
-      { sessionUpdate() {}, requestPermission: () => Promise.resolve({ outcome: { outcome: 'cancelled' } }) },
+      {
+        sessionUpdate() {},
+        requestPermission: () => Promise.resolve({ outcome: { outcome: 'cancelled' } }),
+      },
       {},
     );
 

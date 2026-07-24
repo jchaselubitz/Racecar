@@ -123,8 +123,8 @@ describe('SandboxWaker.tick', () => {
     await waker.tick();
 
     expect(messages.some((message) => message.includes('wake failed for mission boom'))).toBe(true);
-    expect(messages.some((message) => message.includes('resumed 1 sandbox(es) for mission fine'))).toBe(
-      true,
-    );
+    expect(
+      messages.some((message) => message.includes('resumed 1 sandbox(es) for mission fine')),
+    ).toBe(true);
   });
 });

@@ -44,7 +44,9 @@ describe('protocolEventForUpdate', () => {
         question: 'Which deployment environment should I use?',
       }),
     ).toEqual({ command: 'ask', text: 'Which deployment environment should I use?' });
-    expect(protocolEventForUpdate({ sessionUpdate: 'agent_question', question: '   ' })).toBeUndefined();
+    expect(
+      protocolEventForUpdate({ sessionUpdate: 'agent_question', question: '   ' }),
+    ).toBeUndefined();
   });
 });
 
@@ -81,7 +83,9 @@ describe('porcelainPaths', () => {
 
 describe('changedFilesFromShimGitStatus', () => {
   it('uses only the shim turn-end status and preserves its VCS status codes', () => {
-    expect(changedFilesFromShimGitStatus(' M packages/gateway/src/main.ts\n?? notes.txt\n!! ignored')).toEqual([
+    expect(
+      changedFilesFromShimGitStatus(' M packages/gateway/src/main.ts\n?? notes.txt\n!! ignored'),
+    ).toEqual([
       { filePath: 'packages/gateway/src/main.ts', vcsStatus: ' M' },
       { filePath: 'notes.txt', vcsStatus: '??' },
     ]);

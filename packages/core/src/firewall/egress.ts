@@ -1,7 +1,13 @@
 /** Default destinations needed by a JavaScript/TypeScript agent sandbox. */
 export const DEFAULT_EGRESS_ALLOWLIST = [
-  'api.anthropic.com', 'api.daytona.io', 'api.github.com', 'codeload.github.com', 'github.com',
-  'objects.githubusercontent.com', 'registry.npmjs.org', 'registry.yarnpkg.com',
+  'api.anthropic.com',
+  'api.daytona.io',
+  'api.github.com',
+  'codeload.github.com',
+  'github.com',
+  'objects.githubusercontent.com',
+  'registry.npmjs.org',
+  'registry.yarnpkg.com',
 ] as const;
 
 export interface EgressPolicy {
@@ -19,9 +25,11 @@ export interface BuildEgressPolicyInput {
 export function normalizeEgressDomain(value: string): string {
   const domain = value.trim().toLowerCase().replace(/\.$/, '');
   if (
-    domain.length === 0 || domain.length > 253 ||
+    domain.length === 0 ||
+    domain.length > 253 ||
     !/^(?:\*\.)?[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/.test(domain)
-  ) throw new Error(`invalid egress domain '${value}'`);
+  )
+    throw new Error(`invalid egress domain '${value}'`);
   return domain;
 }
 
@@ -29,13 +37,19 @@ export function normalizeEgressDomain(value: string): string {
 export function domainFromRemote(repoUrl: string): string {
   const scpStyle = /^[^@\s]+@([^:\s]+):.+$/u.exec(repoUrl);
   if (scpStyle?.[1] !== undefined) return normalizeEgressDomain(scpStyle[1]);
-  try { return normalizeEgressDomain(new URL(repoUrl).hostname); }
-  catch { throw new Error(`could not determine a domain from repository URL '${repoUrl}'`); }
+  try {
+    return normalizeEgressDomain(new URL(repoUrl).hostname);
+  } catch {
+    throw new Error(`could not determine a domain from repository URL '${repoUrl}'`);
+  }
 }
 
 export function domainFromProviderUrl(providerApiUrl: string): string {
-  try { return normalizeEgressDomain(new URL(providerApiUrl).hostname); }
-  catch { throw new Error(`invalid provider API URL '${providerApiUrl}'`); }
+  try {
+    return normalizeEgressDomain(new URL(providerApiUrl).hostname);
+  } catch {
+    throw new Error(`invalid provider API URL '${providerApiUrl}'`);
+  }
 }
 
 /** Build the fail-closed policy. Projects can extend it, never weaken it. */
@@ -57,6 +71,7 @@ export function parseEgressAllowlist(value: string | undefined): readonly string
 export function isEgressDomainAllowed(policy: EgressPolicy, destination: string): boolean {
   const domain = normalizeEgressDomain(destination);
   return policy.domainAllowList.some(
-    (allowed) => allowed === domain || (allowed.startsWith('*.') && domain.endsWith(allowed.slice(1))),
+    (allowed) =>
+      allowed === domain || (allowed.startsWith('*.') && domain.endsWith(allowed.slice(1))),
   );
 }

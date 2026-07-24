@@ -45,10 +45,7 @@ describe('evaluateQuota', () => {
       ADD_ONE,
       { maxConcurrentSandboxes: 5, maxHourlySpendUsd: 1 },
     );
-    expect(violations.map((v) => v.limit)).toEqual([
-      'maxConcurrentSandboxes',
-      'maxHourlySpendUsd',
-    ]);
+    expect(violations.map((v) => v.limit)).toEqual(['maxConcurrentSandboxes', 'maxHourlySpendUsd']);
   });
 
   it('treats an undefined or non-positive cap as unlimited', () => {

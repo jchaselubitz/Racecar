@@ -47,9 +47,7 @@ const positive = (name: string, value: string | undefined, fallback: number): nu
   if (!Number.isFinite(parsed) || parsed <= 0) throw new Error(`${name} must be a positive number`);
   return parsed;
 };
-const branchStrategy = (
-  value: string | undefined,
-): GatewayBranchStrategy | undefined => {
+const branchStrategy = (value: string | undefined): GatewayBranchStrategy | undefined => {
   if (value === undefined || value.trim().length === 0) return undefined;
   const normalized = value.trim();
   if (normalized === 'per-mission' || normalized === 'shared') return normalized;

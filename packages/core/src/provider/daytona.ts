@@ -201,7 +201,9 @@ export class DaytonaProvider implements SandboxProvider {
         ...(request.labels !== undefined ? { labels: request.labels } : {}),
         ...(request.envVars !== undefined ? { envVars: request.envVars } : {}),
         ...(request.public !== undefined ? { public: request.public } : {}),
-        ...(request.networkBlockAll !== undefined ? { networkBlockAll: request.networkBlockAll } : {}),
+        ...(request.networkBlockAll !== undefined
+          ? { networkBlockAll: request.networkBlockAll }
+          : {}),
         ...(request.domainAllowList !== undefined
           ? { domainAllowList: request.domainAllowList.join(',') }
           : {}),

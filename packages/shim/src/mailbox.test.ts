@@ -37,7 +37,11 @@ describe('Mailbox store', () => {
 
   it('marks an agent question awaiting reply until a reply answers it', () => {
     const mailbox = new Mailbox({ now: fakeClock() });
-    const question = mailbox.post({ kind: 'question', text: 'which database?', sessionId: 'run-1' });
+    const question = mailbox.post({
+      kind: 'question',
+      text: 'which database?',
+      sessionId: 'run-1',
+    });
     expect(question.direction).toBe('agent_to_user');
     expect(question.awaitingReply).toBe(true);
 

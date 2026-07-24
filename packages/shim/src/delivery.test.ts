@@ -88,7 +88,10 @@ class BlockingAgent implements Agent {
           sessionUpdate: 'agent_message_chunk',
           content: {
             type: 'text',
-            text: answer.outcome.outcome === 'selected' ? `did ${answer.outcome.optionId}` : 'cancelled',
+            text:
+              answer.outcome.outcome === 'selected'
+                ? `did ${answer.outcome.optionId}`
+                : 'cancelled',
           },
         });
         return { stopReason: 'end_turn' };
@@ -107,9 +110,7 @@ describe('MailboxDelivery bootstrapping and completion', () => {
 
     mailbox.post({ kind: 'instruction', text: 'fix the parser bug' });
 
-    await vi.waitFor(() =>
-      expect(mailbox.list().some((m) => m.kind === 'completion')).toBe(true),
-    );
+    await vi.waitFor(() => expect(mailbox.list().some((m) => m.kind === 'completion')).toBe(true));
     const [summary] = registry.list();
     expect(summary?.title).toBe('fix the parser bug');
     const completion = mailbox.list().find((m) => m.kind === 'completion');
@@ -126,9 +127,7 @@ describe('MailboxDelivery bootstrapping and completion', () => {
 
     mailbox.post({ kind: 'instruction', text: 'carry on' });
 
-    await vi.waitFor(() =>
-      expect(mailbox.list().some((m) => m.kind === 'completion')).toBe(true),
-    );
+    await vi.waitFor(() => expect(mailbox.list().some((m) => m.kind === 'completion')).toBe(true));
     expect(registry.list()).toHaveLength(1);
     expect(mailbox.list().find((m) => m.kind === 'completion')?.sessionId).toBe(run.id);
   });

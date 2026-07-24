@@ -71,7 +71,9 @@ export class RunAgentServer {
       peer.onRequest(AcpMethod.mailboxList, (params) =>
         this.#mailboxListMessages(params as MailboxListRequest | undefined),
       );
-      peer.onRequest(AcpMethod.mailboxPost, (params) => this.#mailboxPost(params as MailboxPostRequest));
+      peer.onRequest(AcpMethod.mailboxPost, (params) =>
+        this.#mailboxPost(params as MailboxPostRequest),
+      );
       peer.onRequest(AcpMethod.mailboxMarkRead, (params) =>
         this.#mailboxMarkRead(params as MailboxMarkReadRequest),
       );
